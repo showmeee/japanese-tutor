@@ -185,6 +185,7 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
 
 /* Typing */
 .typing { display: flex; gap: 4px; padding: 4px 0; }
+.thinking-label { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text3); }
 .typing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); animation: typingBounce 1.2s infinite; }
 .typing-dot:nth-child(2) { animation-delay: 0.2s; }
 .typing-dot:nth-child(3) { animation-delay: 0.4s; }
@@ -327,10 +328,22 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
     </div>
     <div class="setting-group">
       <div class="setting-label">模型</div>
-      <select class="setting-select" id="settingModel">
-        <option value="deepseek-chat">deepseek-chat（快速）</option>
-        <option value="deepseek-reasoner">deepseek-reasoner（深度推理）</option>
+      <input class="setting-input" id="settingModel" list="modelList" placeholder="deepseek-flash" autocomplete="off" spellcheck="false">
+      <datalist id="modelList">
+        <option value="deepseek-flash">快速，支持图片</option>
+        <option value="deepseek-v4-pro">更强，纯文本</option>
+      </datalist>
+      <div class="setting-hint">flash 快且支持图片，v4-pro 更强但纯文本；也可手填其他兼容服务的模型名</div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">思考强度</div>
+      <select class="setting-select" id="settingEffort">
+        <option value="none">关闭（最快）</option>
+        <option value="low">low（浅想）</option>
+        <option value="high">high（官方默认）</option>
+        <option value="max">max（深想）</option>
       </select>
+      <div class="setting-hint">开启后先思考再回答，更慢也更贵；仅对 DeepSeek 官方接口生效</div>
     </div>
     <div class="setting-group">
       <div class="setting-label">API 地址</div>
@@ -752,7 +765,7 @@ let state = {
   currentId: null,
   apiKey: '',
   apiBase: 'https://api.deepseek.com',
-  model: 'deepseek-chat',
+  model: 'deepseek-flash',
   generating: false,
   abortController: null,
   pendingImage: null,
@@ -761,6 +774,7 @@ let state = {
   deepMode: false,    // false=保留6条历史, true=保留全部
   furigana: true,     // 假名注音
   ttsRate: 0.85,      // 朗读语速
+  reasoningEffort: 'none', // none | low | high | max
 };
 
 // Check localStorage availability (iOS Safari private mode may block it)
@@ -828,8 +842,15 @@ function loadState() {
     }
   } catch(e) {}
   $('#settingKey').value = state.apiKey || '';
-  $('#settingModel').value = state.model || 'deepseek-chat';
+  if (state.model === 'deepseek-chat' || state.model === 'deepseek-reasoner') {
+    state.model = state.model === 'deepseek-chat' ? 'deepseek-flash' : 'deepseek-v4-pro';
+    saveState();
+    showToast('模型已升级为 ' + state.model);
+  }
+  $('#settingModel').value = state.model || 'deepseek-flash';
   $('#settingApi').value = state.apiBase || 'https://api.deepseek.com';
+  if (!state.reasoningEffort) state.reasoningEffort = 'none';
+  $('#settingEffort').value = state.reasoningEffort;
   if (state.furigana === undefined) state.furigana = true;
   if (!state.ttsRate) state.ttsRate = 0.85;
   $('#settingTtsRate').value = String(state.ttsRate);
@@ -1296,6 +1317,14 @@ function appendAssistantPlaceholder() {
   scrollToBottom();
 }
 
+function showThinkingHint() {
+  const el = document.querySelector('#msg-pending .msg-bubble');
+  if (!el || el.dataset.thinking === '1') return;
+  el.dataset.thinking = '1';
+  el.innerHTML = '<div class="thinking-label"><div class="typing"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div><span>思考中…</span></div>';
+  scrollToBottom();
+}
+
 function updateAssistantBubble(content) {
   const el = document.querySelector('#msg-pending .msg-bubble');
   if (!el) return;
@@ -1553,13 +1582,23 @@ async function sendMessage() {
   // Update token estimate
   updateTokenEstimate(apiMessages);
 
+  const reqBody = { model: state.model, messages: apiMessages, stream: true, temperature: 0.7, max_tokens: 4096 };
+  if (/deepseek\.com/.test(state.apiBase)) {
+    if (state.reasoningEffort === 'none') {
+      reqBody.thinking = { type: 'disabled' };
+    } else {
+      reqBody.thinking = { type: 'enabled' };
+      reqBody.reasoning_effort = state.reasoningEffort;
+    }
+  }
+
   let fullContent = '';
   try {
     state.abortController = new AbortController();
     const resp = await fetch(state.apiBase + '/v1/chat/completions', {
       method:'POST',
       headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + state.apiKey },
-      body: JSON.stringify({ model: state.model, messages: apiMessages, stream: true, temperature: 0.7, max_tokens: 4096 }),
+      body: JSON.stringify(reqBody),
       signal: state.abortController.signal,
     });
     if (!resp.ok) {
@@ -1582,8 +1621,9 @@ async function sendMessage() {
         if (data === '[DONE]') continue;
         try {
           const json = JSON.parse(data);
-          const delta = json.choices?.[0]?.delta?.content;
-          if (delta) { fullContent += delta; updateAssistantBubble(fullContent); }
+          const d = json.choices?.[0]?.delta || {};
+          if (d.reasoning_content) showThinkingHint();
+          if (d.content) { fullContent += d.content; updateAssistantBubble(fullContent); }
         } catch(e) {}
       }
     }
@@ -1645,8 +1685,9 @@ function openSettings() {
 }
 function saveSettings() {
   state.apiKey = $('#settingKey').value.trim();
-  state.model = $('#settingModel').value;
+  state.model = $('#settingModel').value.trim() || 'deepseek-flash';
   state.apiBase = $('#settingApi').value.trim().replace(/\/$/, '');
+  state.reasoningEffort = $('#settingEffort').value;
   const saved = saveState();
   settingsModal.classList.remove('show');
   if (saved) {
