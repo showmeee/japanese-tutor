@@ -7,7 +7,10 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#F2F2F7">
 <title>語師 — 日本語教学助手</title>
-<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-title" content="語師">
+<script src="./vendor/marked.min.js"></script>
 <style>
 :root {
   --bg: #F2F2F7; --card: #FFFFFF; --primary: #007AFF; --primary-light: rgba(0,122,255,0.08);
@@ -48,6 +51,13 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); font
 .tab-icon { font-size: 14px; }
 .tab-badge { position: absolute; top: -4px; right: -4px; min-width: 18px; height: 18px; border-radius: 9px; background: var(--pink); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
 .tab-badge:empty { display: none; }
+
+/* Install banner */
+.install-banner { display: flex; align-items: center; gap: 10px; margin: 0 16px 8px; padding: 10px 12px; background: var(--card); border-radius: var(--radius-sm); box-shadow: var(--shadow); font-size: 13px; color: var(--text2); line-height: 1.45; }
+.install-text { flex: 1; }
+.install-text b { font-weight: 600; color: var(--text); }
+.install-btn { flex-shrink: 0; padding: 6px 12px; border: none; border-radius: 14px; background: var(--primary); color: #fff; font-size: 13px; font-weight: 600; font-family: var(--font); cursor: pointer; }
+.install-close { flex-shrink: 0; width: 22px; height: 22px; border: none; border-radius: 50%; background: var(--fill); color: var(--text3); font-size: 12px; cursor: pointer; }
 
 /* Chat */
 .chat { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px 16px 8px; scroll-behavior: smooth; }
@@ -159,6 +169,20 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); font
 
 .msg-image { max-width: 200px; border-radius: 8px; margin-bottom: 8px; cursor: pointer; }
 
+/* Furigana */
+ruby { ruby-position: over; }
+ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height: 1; letter-spacing: 0.02em; }
+.msg.user ruby rt { color: rgba(255,255,255,0.72); }
+
+/* Speak buttons */
+.msg-tools { display: flex; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--sep); }
+.msg-tool { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: none; border-radius: 12px; background: var(--fill); color: var(--text2); font-size: 12px; font-weight: 600; font-family: var(--font); cursor: pointer; transition: all 0.15s; }
+.msg-tool:active { transform: scale(0.95); }
+.msg-tool.speaking { background: var(--primary-light); color: var(--primary); }
+.speak-inline { margin-left: 6px; padding: 1px 6px; border: none; border-radius: 10px; background: var(--fill); font-size: 12px; line-height: 1.6; cursor: pointer; vertical-align: middle; transition: all 0.15s; }
+.speak-inline:active { transform: scale(0.92); }
+.speak-inline.speaking { background: var(--primary-light); }
+
 /* Typing */
 .typing { display: flex; gap: 4px; padding: 4px 0; }
 .typing-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text3); animation: typingBounce 1.2s infinite; }
@@ -172,6 +196,8 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); font
 .input-actions { display: flex; gap: 4px; padding-bottom: 6px; }
 .action-btn { width: 34px; height: 34px; border-radius: 50%; border: none; background: transparent; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--text3); transition: all 0.2s; }
 .action-btn:active { background: var(--fill); }
+.mic-btn.recording { color: var(--pink); animation: micPulse 1.2s ease-in-out infinite; }
+@keyframes micPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.45; transform: scale(0.92); } }
 .input-wrap { flex: 1; background: var(--card); border-radius: 20px; border: 1px solid var(--sep); display: flex; align-items: flex-end; padding: 4px 4px 4px 14px; transition: border-color 0.2s; }
 .input-wrap:focus-within { border-color: var(--primary); }
 #inputText { flex: 1; border: none; outline: none; font-size: 16px; font-family: var(--font); line-height: 1.5; max-height: 120px; min-height: 24px; padding: 6px 0; resize: none; background: transparent; color: var(--text); }
@@ -263,6 +289,11 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); font
     <button class="tab" data-mode="learn"><span class="tab-icon">📖</span> 精进</button>
     <button class="tab" data-mode="review"><span class="tab-icon">🔄</span> 復習<span class="tab-badge" id="reviewBadge"></span></button>
   </div>
+  <div class="install-banner hidden" id="installBanner">
+    <div class="install-text" id="installText"></div>
+    <button class="install-btn hidden" id="installBtn">安装</button>
+    <button class="install-close" id="installClose" aria-label="关闭">✕</button>
+  </div>
   <div class="chat" id="chat"></div>
   <div class="input-area" id="inputArea">
     <div class="image-preview" id="imagePreview">
@@ -272,6 +303,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); font
     <div class="input-row">
       <div class="input-actions">
         <button class="action-btn" id="btnImage" title="拍照/上传图片">📷</button>
+        <button class="action-btn mic-btn" id="btnMic" title="语音输入（日语）">🎤</button>
       </div>
       <div class="input-wrap">
         <textarea id="inputText" rows="1" placeholder="输入日语问题…"></textarea>
@@ -311,6 +343,19 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); font
         <button class="setting-btn" id="modeDeep" style="flex:1;background:var(--fill);color:var(--text2);margin:0;">深度 (完整上下文)</button>
       </div>
       <div class="setting-hint">标准模式保留最近6条对话，深度模式保留全部。深度模式消耗更多token。</div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">注音与朗读</div>
+      <div style="display:flex;gap:8px;">
+        <button class="setting-btn" id="btnFurigana" style="flex:1;background:var(--primary);color:#fff;margin:0;">注音：开</button>
+      </div>
+      <select class="setting-select" id="settingTtsRate" style="margin-top:8px;">
+        <option value="0.7">朗读语速：慢</option>
+        <option value="0.85">朗读语速：较慢</option>
+        <option value="1">朗读语速：正常</option>
+        <option value="1.15">朗读语速：稍快</option>
+      </select>
+      <div class="setting-hint">注音会把「漢字[かんじ]」显示为振假名。朗读使用系统日语语音，iOS 可在 设置 → 辅助功能 → 朗读内容 → 声音 中安装日语（Kyoko）。</div>
     </div>
     <div class="setting-group">
       <div class="setting-label">Token 估算</div>
@@ -714,6 +759,8 @@ let state = {
   reviewCards: {},    // { grammarId: FSRS card }
   reviewSession: null, // { queue: [], index: 0 }
   deepMode: false,    // false=保留6条历史, true=保留全部
+  furigana: true,     // 假名注音
+  ttsRate: 0.85,      // 朗读语速
 };
 
 // Check localStorage availability (iOS Safari private mode may block it)
@@ -744,6 +791,7 @@ const historyList = $('#historyList');
 const toastEl = $('#toast');
 const inputArea = $('#inputArea');
 const reviewBadge = $('#reviewBadge');
+const btnMic = $('#btnMic');
 
 // ─── Init ─────────────────────────────────────────────────────
 function init() {
@@ -751,6 +799,9 @@ function init() {
   initReviewCards();
   renderWelcome();
   bindEvents();
+  TTS.init();
+  setupSpeechInput();
+  setupPWA();
   updateInputPlaceholder();
   updateReviewBadge();
   if (!state.apiKey) {
@@ -779,7 +830,11 @@ function loadState() {
   $('#settingKey').value = state.apiKey || '';
   $('#settingModel').value = state.model || 'deepseek-chat';
   $('#settingApi').value = state.apiBase || 'https://api.deepseek.com';
+  if (state.furigana === undefined) state.furigana = true;
+  if (!state.ttsRate) state.ttsRate = 0.85;
+  $('#settingTtsRate').value = String(state.ttsRate);
   updateModeButtons();
+  updateFuriganaBtn();
 }
 
 function updateModeButtons() {
@@ -799,6 +854,14 @@ function updateModeButtons() {
   }
 }
 
+function updateFuriganaBtn() {
+  const btn = $('#btnFurigana');
+  if (!btn) return;
+  btn.textContent = state.furigana ? '注音：开' : '注音：关';
+  btn.style.background = state.furigana ? 'var(--primary)' : 'var(--fill)';
+  btn.style.color = state.furigana ? '#fff' : 'var(--text2)';
+}
+
 function saveState() {
   if (!storageAvailable) {
     console.warn('Storage not available, settings will not persist after page reload');
@@ -814,6 +877,8 @@ function saveState() {
       mode: state.mode,
       reviewCards: state.reviewCards,
       deepMode: state.deepMode,
+      furigana: state.furigana,
+      ttsRate: state.ttsRate,
     }));
     return true;
   } catch(e) {
@@ -864,6 +929,25 @@ function bindEvents() {
   $('#modeNormal').addEventListener('click', () => { state.deepMode = false; updateModeButtons(); saveState(); });
   $('#modeDeep').addEventListener('click', () => { state.deepMode = true; updateModeButtons(); saveState(); });
 
+  // Furigana & TTS
+  $('#btnFurigana').addEventListener('click', () => {
+    state.furigana = !state.furigana;
+    updateFuriganaBtn();
+    saveState();
+    rerenderCurrentView();
+    showToast(state.furigana ? '已开启注音' : '已关闭注音');
+  });
+  $('#settingTtsRate').addEventListener('change', e => {
+    state.ttsRate = parseFloat(e.target.value) || 0.85;
+    saveState();
+  });
+
+  btnMic.addEventListener('click', toggleSpeechInput);
+  $('#kDetailModal').addEventListener('click', e => {
+    const b = e.target.closest('[data-speak-text]');
+    if (b) TTS.speak(TTS.stripMarkdown(plainJapanese(b.dataset.speakText)), b);
+  });
+
   $('#btnSidebar').addEventListener('click', openSidebar);
   sidebarOverlay.addEventListener('click', closeSidebar);
   $('#newChat').addEventListener('click', () => { newConversation(); closeSidebar(); });
@@ -879,10 +963,14 @@ function bindEvents() {
   chat.addEventListener('click', e => {
     const tip = e.target.closest('.welcome-tip');
     if (tip) { inputText.value = tip.dataset.text; inputText.dispatchEvent(new Event('input')); inputText.focus(); return; }
-    const bubble = e.target.closest('.msg.assistant .msg-bubble');
-    if (bubble) copyMessage(bubble);
+    const speakTextBtn = e.target.closest('[data-speak-text]');
+    if (speakTextBtn) { TTS.speak(TTS.stripMarkdown(plainJapanese(speakTextBtn.dataset.speakText)), speakTextBtn); return; }
+    const speakMsgBtn = e.target.closest('[data-speak-msg]');
+    if (speakMsgBtn) { speakMessage(speakMsgBtn); return; }
     const kchip = e.target.closest('.k-chip');
     if (kchip) { showKnowledgeDetail(kchip.dataset.gid); return; }
+    const bubble = e.target.closest('.msg.assistant .msg-bubble');
+    if (bubble && !e.target.closest('button')) copyMessage(bubble);
     const raBtn = e.target.closest('.review-action-btn');
     if (raBtn) { handleReviewAction(raBtn.dataset.action); return; }
     const ratingBtn = e.target.closest('.rating-btn.rating-btn');
@@ -900,7 +988,7 @@ function bindEvents() {
   let pressTimer;
   chat.addEventListener('touchstart', e => {
     const bubble = e.target.closest('.msg.assistant .msg-bubble');
-    if (!bubble) return;
+    if (!bubble || e.target.closest('.msg-tools, .k-cards, button')) return;
     pressTimer = setTimeout(() => { copyMessage(bubble); showToast('已复制'); }, 500);
   });
   chat.addEventListener('touchend', () => clearTimeout(pressTimer));
@@ -909,6 +997,7 @@ function bindEvents() {
 
 // ─── Mode Switching ───────────────────────────────────────────
 function switchMode(mode) {
+  TTS.stop();
   state.mode = mode;
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.mode === mode));
   modeLabel.textContent = MODE_LABELS[mode];
@@ -966,6 +1055,7 @@ function deleteConversation(id) {
 }
 
 function switchConversation(id) {
+  TTS.stop();
   state.currentId = id;
   const conv = state.conversations[id];
   if (conv) {
@@ -1059,7 +1149,7 @@ function renderReviewSession() {
         <div class="review-card-meaning">${escHtml(grammar.meaning)}</div>
         <div class="review-card-formation">接续：${escHtml(grammar.formation)}</div>
         <div class="review-card-example">
-          <div class="ja">${escHtml(grammar.example_ja)}</div>
+          <div class="ja">${escHtml(grammar.example_ja)}<button class="speak-inline" data-speak-text="${escAttr(grammar.example_ja)}" title="朗读例句">🔊</button></div>
           <div class="zh">${escHtml(grammar.example_zh)}</div>
         </div>
         ${grammar.note ? `<div class="review-card-note">💡 ${escHtml(grammar.note)}</div>` : ''}
@@ -1071,6 +1161,7 @@ function renderReviewSession() {
         <button class="rating-btn easy" data-rating="4">Easy<span class="rb-label">太简单</span></button>
       </div>
     </div>`;
+  applyFurigana(chat);
 }
 
 function renderReviewDone() {
@@ -1150,6 +1241,7 @@ function renderConversation() {
     }
     return html;
   }).join('');
+  applyFurigana(chat);
   scrollToBottom();
 }
 
@@ -1170,8 +1262,12 @@ function renderMessage(msg) {
     return `<div class="msg user"><div class="msg-avatar">我</div><div class="msg-bubble">${content}</div></div>`;
   } else {
     const html = marked.parse(msg.content || '');
-    return `<div class="msg assistant"><div class="msg-avatar">師</div><div class="msg-bubble">${html}</div></div>`;
+    return `<div class="msg assistant" data-raw="${escAttr(msg.content || '')}"><div class="msg-avatar">師</div><div class="msg-bubble">${html}${msgToolsHtml()}</div></div>`;
   }
+}
+
+function msgToolsHtml() {
+  return '<div class="msg-tools"><button class="msg-tool" data-speak-msg>🔊 朗读日文</button></div>';
 }
 
 function appendUserMessage(text, imageData) {
@@ -1185,6 +1281,7 @@ function appendUserMessage(text, imageData) {
   const div = document.createElement('div');
   div.innerHTML = renderMessage(msg);
   chat.appendChild(div.firstElementChild);
+  applyFurigana(chat);
   scrollToBottom();
   saveState();
   renderHistory();
@@ -1203,25 +1300,29 @@ function updateAssistantBubble(content) {
   const el = document.querySelector('#msg-pending .msg-bubble');
   if (!el) return;
   el.innerHTML = marked.parse(content || '');
+  applyFurigana(el);
   scrollToBottom();
 }
 
 function finalizeAssistantBubble(fullContent) {
   const el = document.getElementById('msg-pending');
   if (el) el.id = '';
+  const msgEl = document.querySelector('.msg.assistant:last-child');
+  if (!msgEl) return;
+  const bubble = msgEl.querySelector('.msg-bubble');
+  if (!bubble) return;
+  msgEl.dataset.raw = fullContent || '';
+  applyFurigana(bubble);
   // Detect and add knowledge cards
   if (fullContent) {
     const detected = detectKnowledgeInText(fullContent);
     if (detected.length > 0) {
       const cardsDiv = document.createElement('div');
       cardsDiv.innerHTML = renderKnowledgeCards(detected);
-      const msgEl = document.querySelector('.msg.assistant:last-child');
-      if (msgEl) {
-        const bubble = msgEl.querySelector('.msg-bubble');
-        if (bubble) bubble.appendChild(cardsDiv.firstElementChild);
-      }
+      if (cardsDiv.firstElementChild) bubble.appendChild(cardsDiv.firstElementChild);
     }
   }
+  bubble.insertAdjacentHTML('beforeend', msgToolsHtml());
 }
 
 function scrollToBottom() {
@@ -1232,6 +1333,7 @@ function scrollToBottom() {
 function showKnowledgeDetail(gid) {
   const g = JLPT_INDEX[gid];
   if (!g) return;
+  kDetailId = gid;
   const color = JLPT_COLORS[g.level] || 'var(--text3)';
   const card = state.reviewCards[gid];
   const isSaved = card && card.reps > 0;
@@ -1255,7 +1357,7 @@ function showKnowledgeDetail(gid) {
     <div class="k-modal-section">
       <div class="k-modal-section-title">例句</div>
       <div class="k-modal-example">
-        <div class="ja">${escHtml(g.example_ja)}</div>
+        <div class="ja">${escHtml(g.example_ja)}<button class="speak-inline" data-speak-text="${escAttr(g.example_ja)}" title="朗读例句">🔊</button></div>
         <div class="zh">${escHtml(g.example_zh)}</div>
       </div>
     </div>
@@ -1266,6 +1368,7 @@ function showKnowledgeDetail(gid) {
         : `<button class="k-modal-btn add" onclick="addToReview('${g.id}')">加入复习计划</button>`
       }
     </div>`;
+  applyFurigana(modal);
   $('#kDetailModal').classList.add('show');
 }
 
@@ -1291,11 +1394,12 @@ function removeFromReview(gid) {
 
 // ─── Knowledge Base Browser ───────────────────────────────────
 function openKnowledgeBase() {
-  renderKBList('all');
+  renderKBList(kbFilter);
   $('#kbModal').classList.add('show');
 }
 
 function renderKBList(filter) {
+  kbFilter = filter;
   // Render filter buttons
   const filters = ['all','N5','N4','N3','N2','N1'];
   const filterLabels = { all:'全部', N5:'N5', N4:'N4', N3:'N3', N2:'N2', N1:'N1' };
@@ -1673,13 +1777,281 @@ function showToast(text) {
 }
 
 function copyMessage(bubble) {
-  const text = bubble.innerText;
+  const clone = bubble.cloneNode(true);
+  clone.querySelectorAll('.msg-tools, .k-cards, rt').forEach(n => n.remove());
+  const text = clone.textContent.trim();
   if (!text) return;
-  navigator.clipboard.writeText(text).then(() => showToast('已复制'));
+  navigator.clipboard.writeText(text).then(() => showToast('已复制')).catch(() => {});
+}
+
+// ─── Furigana ─────────────────────────────────────────────────
+const KANJI_SEQ = '[\\u3400-\\u4dbf\\u4e00-\\u9fff々〆ヵヶ]+';
+const KANA_SEQ = '[\\u3040-\\u30ff\\u30fc・]+';
+
+function plainJapanese(text) {
+  return (text || '').replace(/\[[^\]]*\]/g, '');
+}
+
+function buildRubyFragment(text) {
+  const re = new RegExp(`(${KANJI_SEQ})\\[(${KANA_SEQ})\\]`, 'g');
+  const frag = document.createDocumentFragment();
+  let last = 0, match, found = false;
+  while ((match = re.exec(text))) {
+    found = true;
+    if (match.index > last) frag.appendChild(document.createTextNode(text.slice(last, match.index)));
+    if (state.furigana) {
+      const ruby = document.createElement('ruby');
+      ruby.appendChild(document.createTextNode(match[1]));
+      const rt = document.createElement('rt');
+      rt.textContent = match[2];
+      ruby.appendChild(rt);
+      frag.appendChild(ruby);
+    } else {
+      frag.appendChild(document.createTextNode(`${match[1]}（${match[2]}）`));
+    }
+    last = match.index + match[0].length;
+  }
+  if (!found) return null;
+  if (last < text.length) frag.appendChild(document.createTextNode(text.slice(last)));
+  return frag;
+}
+
+function applyFurigana(root) {
+  if (!root) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (!node.nodeValue || node.nodeValue.indexOf('[') === -1) return NodeFilter.FILTER_REJECT;
+      const parent = node.parentElement;
+      return parent && !parent.closest('pre, code, rt, ruby, script, style, textarea, .msg-tools, .k-cards')
+        ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+    }
+  });
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  for (const node of nodes) {
+    const frag = buildRubyFragment(node.nodeValue);
+    if (frag) node.parentNode.replaceChild(frag, node);
+  }
+}
+
+// ─── TTS (Web Speech API) ─────────────────────────────────────
+const TTS = {
+  supported: typeof window.speechSynthesis !== 'undefined' && typeof window.SpeechSynthesisUtterance !== 'undefined',
+  currentBtn: null,
+  voices: [],
+
+  init() {
+    if (!this.supported) return;
+    const load = () => { this.voices = speechSynthesis.getVoices() || []; };
+    load();
+    speechSynthesis.onvoiceschanged = load;
+  },
+
+  jaVoice() {
+    this.voices = speechSynthesis.getVoices() || this.voices;
+    const ja = this.voices.filter(v => /^ja/i.test(v.lang));
+    return ja.find(v => /kyoko|otoya|japan|日本語/i.test(v.name)) || ja[0] || null;
+  },
+
+  stripMarkdown(text) {
+    return (text || '')
+      .replace(/```[\s\S]*?```/g, ' ')
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/[#>*_`~|]/g, ' ')
+      .replace(/[ \t]+/g, ' ')
+      .trim();
+  },
+
+  pickJapanese(text) {
+    const lines = this.stripMarkdown(plainJapanese(text))
+      .split(/\n+/)
+      .map(s => s.trim().replace(/^[-–—•・\d.、]+\s*/, ''))
+      .filter(Boolean)
+      // 去掉「中文标签：」前缀，只读后面的日文
+      .map(l => { const i = l.lastIndexOf('：'); return i >= 0 ? l.slice(i + 1).trim() : l; });
+    const jp = lines.filter(l => {
+      const kana = (l.match(/[\u3040-\u30ff]/g) || []).length;
+      const cjk = (l.match(/[\u4e00-\u9fff]/g) || []).length;
+      return kana > 0 && kana / (kana + cjk) >= 0.15;
+    });
+    return jp.join('\n');
+  },
+
+  speak(text, btn) {
+    if (!this.supported) { showToast('当前浏览器不支持语音朗读'); return; }
+    const wasSpeaking = btn && btn.classList.contains('speaking');
+    this.stop();
+    if (wasSpeaking) return;
+    const clean = (text || '').trim();
+    if (!clean) { showToast('这段内容里没有可朗读的日文'); return; }
+    speechSynthesis.getVoices();
+    const u = new SpeechSynthesisUtterance(clean.slice(0, 2000));
+    u.lang = 'ja-JP';
+    const voice = this.jaVoice();
+    if (voice) u.voice = voice;
+    u.rate = state.ttsRate || 0.85;
+    u.onend = () => this.reset(btn);
+    u.onerror = () => this.reset(btn);
+    this.currentBtn = btn || null;
+    if (btn) btn.classList.add('speaking');
+    speechSynthesis.speak(u);
+  },
+
+  reset(btn) {
+    if (btn) btn.classList.remove('speaking');
+    if (this.currentBtn) this.currentBtn.classList.remove('speaking');
+    this.currentBtn = null;
+  },
+
+  stop() {
+    if (!this.supported) return;
+    speechSynthesis.cancel();
+    if (this.currentBtn) this.currentBtn.classList.remove('speaking');
+    this.currentBtn = null;
+  }
+};
+
+function speakMessage(btn) {
+  const msgEl = btn.closest('.msg');
+  const raw = (msgEl && msgEl.dataset.raw) || '';
+  TTS.speak(TTS.pickJapanese(raw), btn);
+}
+
+// ─── Voice Input (Web Speech API) ─────────────────────────────
+let speechRec = null;
+let speechListening = false;
+let speechBase = '';
+
+function setupSpeechInput() {
+  const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRec) {
+    btnMic.style.opacity = '0.4';
+    btnMic.title = '此浏览器不支持语音输入';
+    return;
+  }
+  speechRec = new SpeechRec();
+  speechRec.lang = 'ja-JP';
+  speechRec.interimResults = true;
+  speechRec.continuous = false;
+  speechRec.onstart = () => {
+    speechListening = true;
+    speechBase = inputText.value.trim() ? inputText.value.trim() + ' ' : '';
+    btnMic.classList.add('recording');
+    showToast('请说日语…');
+  };
+  speechRec.onresult = e => {
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) speechBase += r[0].transcript;
+      else interim += r[0].transcript;
+    }
+    inputText.value = (speechBase + interim).trim();
+    inputText.dispatchEvent(new Event('input'));
+  };
+  speechRec.onerror = e => {
+    const msg = {
+      'not-allowed': '麦克风权限被拒绝',
+      'service-not-allowed': '浏览器禁止了语音识别',
+      'no-speech': '没有听到声音',
+      'audio-capture': '未找到麦克风',
+      'network': '语音识别需要联网'
+    }[e.error] || ('语音识别失败：' + e.error);
+    showToast(msg);
+  };
+  speechRec.onend = () => {
+    speechListening = false;
+    btnMic.classList.remove('recording');
+    inputText.dispatchEvent(new Event('input'));
+  };
+}
+
+function toggleSpeechInput() {
+  if (!speechRec) { showToast('此浏览器不支持语音输入（iOS Safari 暂不支持），可用 Chrome 或安装 App'); return; }
+  if (speechListening) { speechRec.stop(); return; }
+  try { speechRec.start(); } catch (e) { showToast('语音识别启动失败'); }
+}
+
+// ─── PWA Install Prompt ──────────────────────────────────────
+let deferredInstall = null;
+
+function setupPWA() {
+  const banner = $('#installBanner');
+  const textEl = $('#installText');
+  const installBtn = $('#installBtn');
+  if (!banner) return;
+
+  const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (standalone) return;
+
+  let dismissedAt = 0;
+  try { dismissedAt = parseInt(localStorage.getItem('goshi_install_dismissed') || '0', 10) || 0; } catch (e) {}
+  if (Date.now() - dismissedAt < 30 * 86400000) return;
+
+  const ua = navigator.userAgent;
+  const isIOS = /iphone|ipad|ipod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const isWeChat = /micromessenger/i.test(ua);
+
+  const show = () => banner.classList.remove('hidden');
+  const hide = () => {
+    banner.classList.add('hidden');
+    try { localStorage.setItem('goshi_install_dismissed', String(Date.now())); } catch (e) {}
+  };
+
+  if (isWeChat) {
+    textEl.innerHTML = '想装到桌面？点右上角 <b>…</b> → <b>在浏览器打开</b>，再「添加到主屏幕」。';
+    show();
+  } else if (isIOS) {
+    textEl.innerHTML = '装到桌面：点底部 <b>分享</b> → <b>添加到主屏幕</b>，以后像 App 一样打开。';
+    show();
+  }
+
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredInstall = e;
+    if (isIOS || isWeChat || !banner.classList.contains('hidden')) return;
+    textEl.innerHTML = '把「語師」装到桌面，打开更快，断网也能用。';
+    installBtn.classList.remove('hidden');
+    show();
+  });
+
+  installBtn.addEventListener('click', async () => {
+    if (!deferredInstall) return;
+    deferredInstall.prompt();
+    try { await deferredInstall.userChoice; } catch (e) {}
+    deferredInstall = null;
+    hide();
+  });
+
+  $('#installClose').addEventListener('click', hide);
+  window.addEventListener('appinstalled', hide);
+}
+
+// ─── View Refresh (after furigana toggle) ─────────────────────
+let kbFilter = 'all';
+let kDetailId = null;
+
+function rerenderCurrentView() {
+  if (state.mode === 'review') {
+    if (state.reviewSession) renderReviewSession(); else renderReviewWelcome();
+  } else if (state.currentId && state.conversations[state.currentId]) {
+    renderConversation();
+  } else {
+    renderWelcome();
+  }
+  if ($('#kbModal').classList.contains('show')) renderKBList(kbFilter);
+  if ($('#kDetailModal').classList.contains('show') && kDetailId) showKnowledgeDetail(kDetailId);
 }
 
 // ─── Start ────────────────────────────────────────────────────
 init();
+</script>
+<script>
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    });
+  }
 </script>
 </body>
 </html>
