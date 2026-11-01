@@ -1,5 +1,5 @@
 // 修改 index.html 或任何静态资源后，把 VERSION 加一，让客户端拿到新版本
-const VERSION = 'goshi-v3';
+const VERSION = 'goshi-v4';
 const CORE = [
   './',
   './index.html',

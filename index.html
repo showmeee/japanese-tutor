@@ -328,12 +328,13 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
     </div>
     <div class="setting-group">
       <div class="setting-label">模型</div>
-      <input class="setting-input" id="settingModel" list="modelList" placeholder="deepseek-flash" autocomplete="off" spellcheck="false">
-      <datalist id="modelList">
-        <option value="deepseek-flash">快速，支持图片</option>
-        <option value="deepseek-v4-pro">更强，纯文本</option>
-      </datalist>
-      <div class="setting-hint">flash 快且支持图片，v4-pro 更强但纯文本；也可手填其他兼容服务的模型名</div>
+      <select class="setting-select" id="settingModelPick">
+        <option value="deepseek-flash">deepseek-flash（快，支持图片）</option>
+        <option value="deepseek-v4-pro">deepseek-v4-pro（更强，纯文本）</option>
+        <option value="__custom__">自定义…</option>
+      </select>
+      <input class="setting-input" id="settingModel" placeholder="填写模型名" autocomplete="off" spellcheck="false" style="display:none;margin-top:8px;">
+      <div class="setting-hint">flash 快且支持图片，v4-pro 更强但纯文本；接其他服务时选"自定义"填模型名</div>
     </div>
     <div class="setting-group">
       <div class="setting-label">思考强度</div>
@@ -847,7 +848,7 @@ function loadState() {
     saveState();
     showToast('模型已升级为 ' + state.model);
   }
-  $('#settingModel').value = state.model || 'deepseek-flash';
+  syncModelPicker(state.model || 'deepseek-flash');
   $('#settingApi').value = state.apiBase || 'https://api.deepseek.com';
   if (!state.reasoningEffort) state.reasoningEffort = 'none';
   $('#settingEffort').value = state.reasoningEffort;
@@ -856,6 +857,19 @@ function loadState() {
   $('#settingTtsRate').value = String(state.ttsRate);
   updateModeButtons();
   updateFuriganaBtn();
+}
+
+function syncModelPicker(model) {
+  const custom = $('#settingModel');
+  if (model === 'deepseek-flash' || model === 'deepseek-v4-pro') {
+    $('#settingModelPick').value = model;
+    custom.value = '';
+    custom.style.display = 'none';
+  } else {
+    $('#settingModelPick').value = '__custom__';
+    custom.value = model;
+    custom.style.display = 'block';
+  }
 }
 
 function updateModeButtons() {
@@ -961,6 +975,12 @@ function bindEvents() {
   $('#settingTtsRate').addEventListener('change', e => {
     state.ttsRate = parseFloat(e.target.value) || 0.85;
     saveState();
+  });
+  $('#settingModelPick').addEventListener('change', e => {
+    const custom = $('#settingModel');
+    const isCustom = e.target.value === '__custom__';
+    custom.style.display = isCustom ? 'block' : 'none';
+    if (isCustom) { custom.focus(); }
   });
 
   btnMic.addEventListener('click', toggleSpeechInput);
@@ -1685,7 +1705,13 @@ function openSettings() {
 }
 function saveSettings() {
   state.apiKey = $('#settingKey').value.trim();
-  state.model = $('#settingModel').value.trim() || 'deepseek-flash';
+  const picked = $('#settingModelPick').value;
+  state.model = picked === '__custom__'
+    ? ($('#settingModel').value.trim() || 'deepseek-flash')
+    : picked;
+  if (picked === '__custom__' && !$('#settingModel').value.trim()) {
+    syncModelPicker(state.model);
+  }
   state.apiBase = $('#settingApi').value.trim().replace(/\/$/, '');
   state.reasoningEffort = $('#settingEffort').value;
   const saved = saveState();
