@@ -369,7 +369,12 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
         <option value="1">朗读语速：正常</option>
         <option value="1.15">朗读语速：稍快</option>
       </select>
-      <div class="setting-hint">注音会把「漢字[かんじ]」显示为振假名。朗读使用系统日语语音，iOS 可在 设置 → 辅助功能 → 朗读内容 → 声音 中安装日语（Kyoko）。</div>
+      <select class="setting-select" id="settingExampleVoice" style="margin-top:8px;">
+        <option value="nanami">例句朗读：女声 Nanami</option>
+        <option value="keita">例句朗读：男声 Keita</option>
+        <option value="system">例句朗读：系统语音</option>
+      </select>
+      <div class="setting-hint">注音会把「漢字[かんじ]」显示为振假名。语法例句用预录的自然语音，AI 回答用系统语音；iOS 可在 设置 → 辅助功能 → 朗读内容 → 声音 → 日语 中下载「Kyoko（增强）」，系统语音会自动优先使用它。</div>
     </div>
     <div class="setting-group">
       <div class="setting-label">Token 估算</div>
@@ -775,6 +780,7 @@ let state = {
   deepMode: false,    // false=保留6条历史, true=保留全部
   furigana: true,     // 假名注音
   ttsRate: 0.85,      // 朗读语速
+  exampleVoice: 'nanami', // nanami | keita | system（语法例句朗读）
   reasoningEffort: 'none', // none | low | high | max
 };
 
@@ -855,6 +861,8 @@ function loadState() {
   if (state.furigana === undefined) state.furigana = true;
   if (!state.ttsRate) state.ttsRate = 0.85;
   $('#settingTtsRate').value = String(state.ttsRate);
+  if (!state.exampleVoice) state.exampleVoice = 'nanami';
+  $('#settingExampleVoice').value = state.exampleVoice;
   updateModeButtons();
   updateFuriganaBtn();
 }
@@ -914,6 +922,8 @@ function saveState() {
       deepMode: state.deepMode,
       furigana: state.furigana,
       ttsRate: state.ttsRate,
+      exampleVoice: state.exampleVoice,
+      reasoningEffort: state.reasoningEffort,
     }));
     return true;
   } catch(e) {
@@ -976,6 +986,11 @@ function bindEvents() {
     state.ttsRate = parseFloat(e.target.value) || 0.85;
     saveState();
   });
+  $('#settingExampleVoice').addEventListener('change', e => {
+    state.exampleVoice = e.target.value;
+    ExampleAudio.stop();
+    saveState();
+  });
   $('#settingModelPick').addEventListener('change', e => {
     const custom = $('#settingModel');
     const isCustom = e.target.value === '__custom__';
@@ -986,7 +1001,7 @@ function bindEvents() {
   btnMic.addEventListener('click', toggleSpeechInput);
   $('#kDetailModal').addEventListener('click', e => {
     const b = e.target.closest('[data-speak-text]');
-    if (b) TTS.speak(TTS.stripMarkdown(plainJapanese(b.dataset.speakText)), b);
+    if (b) ExampleAudio.play(b.dataset.exampleId, b);
   });
 
   $('#btnSidebar').addEventListener('click', openSidebar);
@@ -1005,7 +1020,7 @@ function bindEvents() {
     const tip = e.target.closest('.welcome-tip');
     if (tip) { inputText.value = tip.dataset.text; inputText.dispatchEvent(new Event('input')); inputText.focus(); return; }
     const speakTextBtn = e.target.closest('[data-speak-text]');
-    if (speakTextBtn) { TTS.speak(TTS.stripMarkdown(plainJapanese(speakTextBtn.dataset.speakText)), speakTextBtn); return; }
+    if (speakTextBtn) { ExampleAudio.play(speakTextBtn.dataset.exampleId, speakTextBtn); return; }
     const speakMsgBtn = e.target.closest('[data-speak-msg]');
     if (speakMsgBtn) { speakMessage(speakMsgBtn); return; }
     const kchip = e.target.closest('.k-chip');
@@ -1190,7 +1205,7 @@ function renderReviewSession() {
         <div class="review-card-meaning">${escHtml(grammar.meaning)}</div>
         <div class="review-card-formation">接续：${escHtml(grammar.formation)}</div>
         <div class="review-card-example">
-          <div class="ja">${escHtml(grammar.example_ja)}<button class="speak-inline" data-speak-text="${escAttr(grammar.example_ja)}" title="朗读例句">🔊</button></div>
+          <div class="ja">${escHtml(grammar.example_ja)}<button class="speak-inline" data-example-id="${escAttr(grammar.id)}" data-speak-text="${escAttr(grammar.example_ja)}" title="朗读例句">🔊</button></div>
           <div class="zh">${escHtml(grammar.example_zh)}</div>
         </div>
         ${grammar.note ? `<div class="review-card-note">💡 ${escHtml(grammar.note)}</div>` : ''}
@@ -1406,7 +1421,7 @@ function showKnowledgeDetail(gid) {
     <div class="k-modal-section">
       <div class="k-modal-section-title">例句</div>
       <div class="k-modal-example">
-        <div class="ja">${escHtml(g.example_ja)}<button class="speak-inline" data-speak-text="${escAttr(g.example_ja)}" title="朗读例句">🔊</button></div>
+        <div class="ja">${escHtml(g.example_ja)}<button class="speak-inline" data-example-id="${escAttr(g.id)}" data-speak-text="${escAttr(g.example_ja)}" title="朗读例句">🔊</button></div>
         <div class="zh">${escHtml(g.example_zh)}</div>
       </div>
     </div>
@@ -1901,11 +1916,43 @@ function applyFurigana(root) {
   }
 }
 
+// ─── 例句朗读（预录音频，失败回退系统语音） ──────────────────
+const ExampleAudio = {
+  el: null,
+  btn: null,
+
+  stop() {
+    if (this.el) {
+      this.el.pause();
+      this.el.onended = null;
+      this.el.onerror = null;
+      this.el = null;
+    }
+    if (this.btn) { this.btn.classList.remove('speaking'); this.btn = null; }
+  },
+
+  play(id, btn) {
+    const speakSystem = () => TTS.speak(TTS.stripMarkdown(plainJapanese(btn.dataset.speakText)), btn);
+    if (!id || state.exampleVoice === 'system' || navigator.onLine === false) { speakSystem(); return; }
+    const sameBtn = this.btn === btn;
+    this.stop();
+    if (sameBtn) return;
+    const audio = new Audio(`audio/examples/${id}.${state.exampleVoice}.mp3`);
+    this.el = audio;
+    this.btn = btn;
+    btn.classList.add('speaking');
+    audio.onended = () => this.stop();
+    audio.onerror = () => { this.stop(); speakSystem(); };
+    audio.play().catch(() => { this.stop(); speakSystem(); });
+  }
+};
+
 // ─── TTS (Web Speech API) ─────────────────────────────────────
 const TTS = {
   supported: typeof window.speechSynthesis !== 'undefined' && typeof window.SpeechSynthesisUtterance !== 'undefined',
   currentBtn: null,
   voices: [],
+  session: 0,
 
   init() {
     if (!this.supported) return;
@@ -1917,7 +1964,21 @@ const TTS = {
   jaVoice() {
     this.voices = speechSynthesis.getVoices() || this.voices;
     const ja = this.voices.filter(v => /^ja/i.test(v.lang));
-    return ja.find(v => /kyoko|otoya|japan|日本語/i.test(v.name)) || ja[0] || null;
+    const rank = v => (/enhanced|premium|neural|natural/i.test(v.name) ? 2 : 0)
+      + (/kyoko|otoya/i.test(v.name) ? 1 : 0);
+    return ja.sort((a, b) => rank(b) - rank(a))[0] || null;
+  },
+
+  splitSentences(text) {
+    const out = [];
+    for (const para of text.split(/\n+/)) {
+      const parts = para.match(/[^。！？!?]+[。！？!?]*/g) || [];
+      for (const p of parts) {
+        const s = p.trim();
+        if (s && /[\u3040-\u30ff]/.test(s)) out.push(s);
+      }
+    }
+    return out;
   },
 
   stripMarkdown(text) {
@@ -1930,14 +1991,31 @@ const TTS = {
   },
 
   pickJapanese(text) {
+    const kanaCount = s => (s.match(/[\u3040-\u30ff]/g) || []).length;
     const lines = this.stripMarkdown(plainJapanese(text))
       .split(/\n+/)
       .map(s => s.trim().replace(/^[-–—•・\d.、]+\s*/, ''))
       .filter(Boolean)
       // 去掉「中文标签：」前缀，只读后面的日文
-      .map(l => { const i = l.lastIndexOf('：'); return i >= 0 ? l.slice(i + 1).trim() : l; });
+      .map(l => { const i = l.lastIndexOf('：'); return i >= 0 ? l.slice(i + 1).trim() : l; })
+      // 去掉纯中文的括注，如「（我现在在学习）」
+      .map(l => l.replace(/[（(][^（）()]*[）)]/g, m => /[\u3040-\u30ff]/.test(m) ? m : ' ').trim())
+      // 「〜ている 表示正在做的事」这类日文+中文混排，只留日文那一半
+      .map(l => {
+        const m = l.match(/^(\S+)[\s　]+(\S.*)$/);
+        if (!m) return l;
+        const headKana = kanaCount(m[1]);
+        const tailKana = kanaCount(m[2]);
+        if (headKana && !tailKana) return m[1];
+        if (!headKana && tailKana) return m[2];
+        return l;
+      })
+      // 语法句型的前缀波浪号不用读出来
+      .map(l => l.replace(/^[〜～]+/, ''))
+      // 「动词て形 + いる」这类接续公式不读
+      .filter(l => !/[+＋→]/.test(l));
     const jp = lines.filter(l => {
-      const kana = (l.match(/[\u3040-\u30ff]/g) || []).length;
+      const kana = kanaCount(l);
       const cjk = (l.match(/[\u4e00-\u9fff]/g) || []).length;
       return kana > 0 && kana / (kana + cjk) >= 0.15;
     });
@@ -1946,22 +2024,35 @@ const TTS = {
 
   speak(text, btn) {
     if (!this.supported) { showToast('当前浏览器不支持语音朗读'); return; }
+    ExampleAudio.stop();
     const wasSpeaking = btn && btn.classList.contains('speaking');
     this.stop();
     if (wasSpeaking) return;
-    const clean = (text || '').trim();
-    if (!clean) { showToast('这段内容里没有可朗读的日文'); return; }
+    const sentences = this.splitSentences((text || '').trim());
+    if (!sentences.length) { showToast('这段内容里没有可朗读的日文'); return; }
     speechSynthesis.getVoices();
-    const u = new SpeechSynthesisUtterance(clean.slice(0, 2000));
-    u.lang = 'ja-JP';
-    const voice = this.jaVoice();
-    if (voice) u.voice = voice;
-    u.rate = state.ttsRate || 0.85;
-    u.onend = () => this.reset(btn);
-    u.onerror = () => this.reset(btn);
+    this.session++;
+    const session = this.session;
     this.currentBtn = btn || null;
     if (btn) btn.classList.add('speaking');
-    speechSynthesis.speak(u);
+    const voice = this.jaVoice();
+    const rate = state.ttsRate || 0.95;
+    let remaining = sentences.length;
+    const done = () => {
+      if (session !== this.session) return;
+      if (--remaining === 0) this.reset(this.currentBtn);
+    };
+    // 一次性全部入队：iOS Safari 在 onend 里再 speak 会偶发卡死，让引擎自己排队最稳
+    sentences.forEach(s => {
+      const u = new SpeechSynthesisUtterance(s);
+      u.lang = 'ja-JP';
+      if (voice) u.voice = voice;
+      u.rate = rate;
+      u.pitch = 1;
+      u.onend = done;
+      u.onerror = done;
+      speechSynthesis.speak(u);
+    });
   },
 
   reset(btn) {
@@ -1972,6 +2063,7 @@ const TTS = {
 
   stop() {
     if (!this.supported) return;
+    this.session++;
     speechSynthesis.cancel();
     if (this.currentBtn) this.currentBtn.classList.remove('speaking');
     this.currentBtn = null;
