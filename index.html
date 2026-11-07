@@ -236,6 +236,11 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
 .crop-hint { font-size: 12px; color: var(--text3); text-align: center; margin-top: 10px; }
 .crop-actions { display: flex; gap: 8px; margin-top: 12px; }
 .crop-actions .setting-btn { flex: 1; margin: 0; }
+.ocr-loading { display: none; align-items: center; justify-content: center; gap: 8px; height: 140px; font-size: 14px; color: var(--text3); }
+.ocr-loading.show { display: flex; }
+.ocr-text { display: none; height: 30vh; min-height: 140px; line-height: 1.7; resize: vertical; }
+.ocr-text.show { display: block; }
+.setting-btn:disabled { opacity: 0.5; }
 .setting-group { margin-bottom: 18px; }
 .setting-label { font-size: 13px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
 .setting-input { width: 100%; padding: 10px 12px; border: 1px solid var(--sep); border-radius: var(--radius-sm); font-size: 15px; font-family: var(--font); background: var(--card); color: var(--text); outline: none; transition: border-color 0.2s; }
@@ -347,11 +352,26 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
         </div>
       </div>
     </div>
-    <div class="crop-hint">拖动方框选中题目区域，只发送框内的内容；默认已覆盖画面中部。</div>
+    <div class="crop-hint">拖动方框只框住一道题，框外内容不会发送。</div>
     <div class="crop-actions">
       <button class="setting-btn secondary" id="cropCancel">取消</button>
       <button class="setting-btn secondary" id="cropWhole">用整张</button>
       <button class="setting-btn primary" id="cropConfirm">确定</button>
+    </div>
+  </div>
+</div>
+
+<!-- OCR Confirm Modal -->
+<div class="modal-overlay" id="ocrModal">
+  <div class="modal" style="position:relative;">
+    <h3>核对识别出的题目</h3>
+    <div class="ocr-loading" id="ocrLoading">正在识别图片中的文字…</div>
+    <textarea class="setting-input ocr-text" id="ocrText" placeholder="识别结果会显示在这里，可直接修改"></textarea>
+    <div class="setting-hint" id="ocrHint">逐字核对，可直接修改；改好后点「开始分析」。</div>
+    <div class="crop-actions">
+      <button class="setting-btn secondary" id="ocrCancel">取消</button>
+      <button class="setting-btn secondary" id="ocrRetry">重新识别</button>
+      <button class="setting-btn primary" id="ocrStart">开始分析</button>
     </div>
   </div>
 </div>
@@ -761,6 +781,8 @@ const SYSTEM_PROMPTS = {
 5. 【逐项分析】每个选项✓/✗，说明原因
 6. 【正确答案】给答案+确信度（高/中/低）+ 验证理由
 7. 【教学建议】如何避免这类错误
+8. 若用户消息含【题目原文（已核对）】，以该文字为准，图片只用于确认版式；两者冲突时以文字为准
+9. 题干或选项不完整时明确指出缺什么，不要臆测补全
 
 所有日语标假名：漢字[かんじ]，Markdown格式。`,
 
@@ -781,6 +803,14 @@ const SYSTEM_PROMPTS = {
 };
 
 const MODE_LABELS = { qa:'问答', exam:'真题', summary:'总结', learn:'精进', review:'復習' };
+
+const OCR_PROMPT = `你是日语试题 OCR 转录工具，只输出转录结果，不做任何解释。
+规则：
+1. 逐字转录图片中最完整的一道题（题干＋所有选项），保留汉字、假名、标点、题号、选项编号和换行
+2. 有多道题时只选一道：优先画面中央且内容完整的那道，并在第一行写「题号：…」
+3. 无法辨认的字符用 □ 代替，不要猜写
+4. 不要翻译、不要分析、不要给答案、不要补全缺失内容
+5. 图片里没有可辨认的日语题目时，只输出：未识别到题目`;
 
 const WELCOME_DATA = {
   qa: { icon:'💬', title:'日语问答', desc:'语法·词汇·表达——即时解答', tips:[
@@ -1013,6 +1043,12 @@ function bindEvents() {
   $('#cropWhole').addEventListener('click', () => confirmCrop(true));
   $('#cropConfirm').addEventListener('click', () => confirmCrop(false));
   $('#cropModal').addEventListener('click', e => { if (e.target === $('#cropModal')) closeCrop(); });
+
+  // OCR 核对
+  $('#ocrCancel').addEventListener('click', closeOcr);
+  $('#ocrRetry').addEventListener('click', () => { if (state.pendingImage) startOcr(state.pendingImage); });
+  $('#ocrStart').addEventListener('click', submitOcr);
+  $('#ocrModal').addEventListener('click', e => { if (e.target === $('#ocrModal')) closeOcr(); });
 
   $('#btnSettings').addEventListener('click', openSettings);
   $('#closeSettings').addEventListener('click', () => settingsModal.classList.remove('show'));
@@ -1384,7 +1420,8 @@ function appendUserMessage(text, imageData) {
   const msg = { role:'user', content: text, image: imageData || null };
   conv.messages.push(msg);
   if (conv.messages.filter(m => m.role === 'user').length === 1) {
-    conv.title = text.slice(0, 30) + (text.length > 30 ? '…' : '');
+    const titleSrc = text.replace(/^【题目原文（已核对）】\s*/, '').trim();
+    conv.title = titleSrc.slice(0, 30) + (titleSrc.length > 30 ? '…' : '');
   }
   const div = document.createElement('div');
   div.innerHTML = renderMessage(msg);
@@ -1883,8 +1920,8 @@ function cropToDataUrl(whole) {
     sw = Math.round(r.w * kx);
     sh = Math.round(r.h * ky);
   }
-  // 限制最长边，避免把原图几 MB 直接塞进请求
-  const MAX = 1600;
+  // 限制最长边，避免把原图几 MB 直接塞进请求；日语小字需要足够分辨率
+  const MAX = 2048;
   const k = Math.min(1, MAX / Math.max(sw, sh));
   const dw = Math.max(1, Math.round(sw * k));
   const dh = Math.max(1, Math.round(sh * k));
@@ -1893,7 +1930,7 @@ function cropToDataUrl(whole) {
   canvas.height = dh;
   const ctx = canvas.getContext('2d');
   ctx.drawImage(img, sx, sy, sw, sh, 0, 0, dw, dh);
-  return canvas.toDataURL('image/jpeg', 0.88);
+  return canvas.toDataURL('image/jpeg', 0.9);
 }
 
 function confirmCrop(whole) {
@@ -1905,6 +1942,91 @@ function confirmCrop(whole) {
   imagePreview.classList.add('show');
   btnSend.disabled = false;
   if (state.mode !== 'exam') switchMode('exam');
+  if (!state.apiKey) {
+    openSettings();
+    showToast('请先设置 API Key');
+    return;
+  }
+  startOcr(dataUrl);
+}
+
+// ─── OCR Confirm ──────────────────────────────────────────────
+let ocrSeq = 0;
+
+function startOcr(dataUrl) {
+  const seq = ++ocrSeq;
+  const modal = $('#ocrModal');
+  modal.classList.add('show');
+  $('#ocrText').value = '';
+  setOcrState('loading');
+  ocrImage(dataUrl).then(text => {
+    if (seq !== ocrSeq) return;
+    if (!text) throw new Error('没有识别出文字');
+    $('#ocrText').value = text;
+    setOcrState('done');
+  }).catch(e => {
+    if (seq !== ocrSeq) return;
+    setOcrState('error', '识别失败：' + (e.message || '请重试'));
+  });
+}
+
+async function ocrImage(dataUrl) {
+  const reqBody = {
+    model: state.model,
+    messages: [
+      { role:'system', content: OCR_PROMPT },
+      { role:'user', content:[
+        { type:'text', text:'请转录这张图片里的日语题目。' },
+        { type:'image_url', image_url:{ url: dataUrl } },
+      ]},
+    ],
+    stream: false,
+    temperature: 0,
+    max_tokens: 2000,
+  };
+  // 识别不需要推理，强制关闭以降低延迟
+  if (/deepseek\.com/.test(state.apiBase)) reqBody.thinking = { type: 'disabled' };
+  const resp = await fetch(state.apiBase + '/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + state.apiKey },
+    body: JSON.stringify(reqBody),
+  });
+  if (!resp.ok) {
+    const err = await resp.text();
+    throw new Error(`API ${resp.status}: ${err.slice(0, 120)}`);
+  }
+  const json = await resp.json();
+  const c = json.choices?.[0]?.message?.content;
+  const raw = typeof c === 'string' ? c : Array.isArray(c) ? c.map(p => p.text || '').join('') : '';
+  return raw.replace(/^```[a-z]*\n?/i, '').replace(/```$/, '').trim();
+}
+
+function setOcrState(kind, msg) {
+  $('#ocrLoading').classList.toggle('show', kind === 'loading');
+  $('#ocrText').classList.toggle('show', kind !== 'loading');
+  $('#ocrStart').disabled = kind === 'loading';
+  $('#ocrRetry').disabled = kind === 'loading';
+  if (kind === 'loading') {
+    $('#ocrHint').textContent = '只做文字识别，不分析答案。';
+  } else if (kind === 'error') {
+    $('#ocrHint').textContent = msg || '识别失败，可以重试或手动输入题目';
+  } else {
+    $('#ocrHint').textContent = '逐字核对，可直接修改；改好后点「开始分析」。';
+  }
+}
+
+function closeOcr() {
+  ocrSeq++;
+  $('#ocrModal').classList.remove('show');
+}
+
+function submitOcr() {
+  const txt = $('#ocrText').value.trim();
+  if (!txt) { showToast('请先核对或输入题目文字'); return; }
+  closeOcr();
+  inputText.value = `【题目原文（已核对）】\n${txt}`;
+  inputText.dispatchEvent(new Event('input', { bubbles: true }));
+  sendMessage();
 }
 
 function clearImage() {
