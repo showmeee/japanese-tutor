@@ -497,6 +497,12 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
       <div class="setting-hint">导入即校验：选项 3–4 个、答案在范围内、id 唯一且不复用。题库只存本机浏览器，不上传、不进 git。</div>
     </div>
     <button class="setting-btn secondary" id="bankExport">⬇️ 导出题库 JSON（本机备份/换机迁移）</button>
+    <div class="setting-group" id="bankReportsGroup" style="display:none;">
+      <div class="setting-label">⚑ 报错清单</div>
+      <div class="bank-list" id="bankReports"></div>
+      <button class="setting-btn secondary" id="bankReportsExport">⬇️ 导出报错（发老师裁决）</button>
+      <div class="setting-hint">「下架」删除该题并移除记录；「忽略」仅移除记录。内置题下架后不会自动恢复。</div>
+    </div>
     <div class="bank-list" id="bankList"></div>
   </div>
 </div>
@@ -1215,6 +1221,23 @@ function bindEvents() {
     bankInvalidate();
     renderBank();
   });
+  $('#bankReportsExport').addEventListener('click', bankReportsExport);
+  $('#bankReports').addEventListener('click', async e => {
+    const retire = e.target.closest('[data-report-retire]');
+    const dismiss = e.target.closest('[data-report-dismiss]');
+    if (!retire && !dismiss) return;
+    const list = bankReportsLoad();
+    const idx = parseInt((retire || dismiss).dataset.reportRetire ?? (retire || dismiss).dataset.reportDismiss, 10);
+    const r = list[idx];
+    if (!r) return;
+    if (retire) {
+      if (!confirm('下架这道题？将从本机题库删除。')) return;
+      if (r.bankId) { await bankDelete(r.bankId); bankInvalidate(); }
+    }
+    list.splice(idx, 1);
+    bankReportsSave(list);
+    renderBank();
+  });
   $('#closeBankSave').addEventListener('click', () => $('#bankSaveModal').classList.remove('show'));
   $('#bankSaveCancel').addEventListener('click', () => $('#bankSaveModal').classList.remove('show'));
   $('#bankSaveModal').addEventListener('click', e => { if (e.target === $('#bankSaveModal')) $('#bankSaveModal').classList.remove('show'); });
@@ -1235,6 +1258,8 @@ function bindEvents() {
     if (checkBtn) { checkAnswer(checkBtn); return; }
     const saveBankBtn = e.target.closest('[data-save-bank]');
     if (saveBankBtn) { openBankSave(saveBankBtn); return; }
+    const reportBtn = e.target.closest('[data-report-bank]');
+    if (reportBtn) { reportBankIssue(reportBtn); return; }
     const kchip = e.target.closest('.k-chip');
     if (kchip) { showKnowledgeDetail(kchip.dataset.gid); return; }
     const bubble = e.target.closest('.msg.assistant .msg-bubble');
@@ -1540,7 +1565,8 @@ function msgToolsHtml(msg) {
   const inBank = !!(msg && msg.bank);
   const check = exam && !inBank ? '<button class="msg-tool" data-check-msg>🔁 复核</button>' : '';
   const save = exam && !inBank ? '<button class="msg-tool" data-save-bank>💾 存题</button>' : '';
-  return `<div class="msg-tools"><button class="msg-tool" data-speak-msg>🔊 朗读日文</button>${check}${save}</div>`;
+  const report = exam && inBank ? '<button class="msg-tool" data-report-bank>⚑ 报错</button>' : '';
+  return `<div class="msg-tools"><button class="msg-tool" data-speak-msg>🔊 朗读日文</button>${check}${save}${report}</div>`;
 }
 
 function appendUserMessage(text, imageData, ocrVerified) {
@@ -2545,7 +2571,7 @@ function bankHitHtml(b) {
   const n = (b.answer ?? 0) + 1;
   const ct = b.choiceTexts && b.choiceTexts[b.answer] ? `（${escHtml(b.choiceTexts[b.answer])}）` : '';
   const src = b.source ? ` · 来源：${escHtml(b.source)}` : '';
-  return `<div class="bank-hit">📚 真题库命中 · 标准答案 ${n}${ct}${src} · 答案以库为准，解析由模型生成</div>`;
+  return `<div class="bank-hit" data-bank-id="${escAttr(b.id || '')}">📚 真题库命中 · 标准答案 ${n}${ct}${src} · 答案以库为准，解析由模型生成</div>`;
 }
 function bankAuthorityPrompt(b) {
   const n = b.answer + 1;
@@ -2561,6 +2587,7 @@ async function openBank() {
 }
 async function renderBank() {
   const all = await bankAll();
+  renderBankReports();
   $('#bankCount').textContent = `共 ${all.length} 题 · 仅存本机浏览器，不上传、不进 git`;
   $('#bankList').innerHTML = all.length ? all.map(q => `
     <div class="bank-item">
@@ -2619,11 +2646,78 @@ async function confirmBankSave() {
   };
   const err = bankValidate(q);
   if (err) { showToast(err); return; }
+  const warns = bankAmbiguityWarnings(q);
+  if (warns.length && !confirm('检测到潜在歧义：\n' + warns.join('\n') + '\n\n仍要存入吗？')) return;
   await bankPut(q);
   bankInvalidate();
   $('#bankSaveModal').classList.remove('show');
   if (bankSaveCtx && bankSaveCtx.btn) { bankSaveCtx.btn.textContent = '✓ 已存'; bankSaveCtx.btn.disabled = true; }
   showToast(`已存入真题库（共 ${await bankCount()} 题）`);
+}
+
+// 常见双答案陷阱（参考 Japanese-AI-Coach-bank 歧义规则）：只警告，由教师裁决
+const BANK_AMBIG_PAIRS = [['は','が'],['に','へ'],['と','や'],['で','に'],['から','ので'],['のに','ても'],['ば','たら'],['なら','たら']];
+function bankAmbiguityWarnings(q) {
+  const w = [];
+  const cs = (q.choices || []).map(c => bankNorm(c));
+  for (let i = 0; i < cs.length; i++) for (let j = i + 1; j < cs.length; j++) {
+    if (!cs[i] || !cs[j]) continue;
+    if (cs[i] === cs[j]) w.push(`选项 ${i + 1} 与 ${j + 1} 归一化后相同`);
+    else if (Math.min(cs[i].length, cs[j].length) <= 3 && (cs[i].includes(cs[j]) || cs[j].includes(cs[i]))) w.push(`选项 ${i + 1}「${q.choices[i]}」与 ${j + 1}「${q.choices[j]}」存在包含关系，可能双解`);
+  }
+  for (const [a, b] of BANK_AMBIG_PAIRS) {
+    const ia = cs.indexOf(a), ib = cs.indexOf(b);
+    if (ia >= 0 && ib >= 0) w.push(`选项 ${ia + 1}「${a}」与 ${ib + 1}「${b}」常可同时成立，请确认题干有唯一解`);
+  }
+  return w;
+}
+
+// ─── 报错通道：学生标记问题 → 本地清单 → 导出给老师 / 老师直接下架 ───
+const BANK_REPORTS_KEY = 'goshi_bank_reports';
+function bankReportsLoad() {
+  try { return JSON.parse(localStorage.getItem(BANK_REPORTS_KEY) || '[]'); } catch (e) { return []; }
+}
+function bankReportsSave(list) {
+  try { localStorage.setItem(BANK_REPORTS_KEY, JSON.stringify(list.slice(-200))); } catch (e) {}
+}
+function reportBankIssue(btn) {
+  const msgEl = btn.closest('.msg.assistant');
+  const bankId = msgEl.querySelector('.bank-hit')?.dataset.bankId || '';
+  let prev = msgEl.previousElementSibling;
+  while (prev && !prev.classList.contains('user')) prev = prev.previousElementSibling;
+  const qText = prev ? (prev.querySelector('.msg-bubble')?.textContent || '').trim() : '';
+  const reason = prompt('这道题哪里有问题？（如：答案错了／题干识别有误／解析不对）');
+  if (reason === null) return;
+  const list = bankReportsLoad();
+  list.push({ bankId, stem: qText.slice(0, 120), reason: reason.trim() || '未说明', at: Date.now() });
+  bankReportsSave(list);
+  btn.textContent = '⚑ 已记录';
+  btn.disabled = true;
+  showToast('已记录报错，可在 🗂️ 题库面板导出给老师');
+}
+function bankReportsExport() {
+  const list = bankReportsLoad();
+  if (!list.length) { showToast('没有报错记录'); return; }
+  const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), reports: list }, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `goshi_bank_reports_${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`已导出 ${list.length} 条报错`);
+}
+function renderBankReports() {
+  const list = bankReportsLoad();
+  $('#bankReportsGroup').style.display = list.length ? '' : 'none';
+  $('#bankReports').innerHTML = list.map((r, i) => `
+    <div class="bank-item">
+      <div class="bi-main">
+        <div class="bi-stem">${escHtml(r.stem || r.bankId)}</div>
+        <div class="bi-meta">⚑ ${escHtml(r.reason)} · ${new Date(r.at).toLocaleString()} · ${escHtml(r.bankId)}</div>
+      </div>
+      <button class="bank-item-del" data-report-retire="${i}" title="下架该题并移除记录">下架</button>
+      <button class="bank-item-del" data-report-dismiss="${i}" title="仅移除记录">忽略</button>
+    </div>`).join('');
 }
 
 // ─── Settings ─────────────────────────────────────────────────

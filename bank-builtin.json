@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "exportedAt": "2026-11-16T14:28:31.464Z",
+  "exportedAt": "2026-11-16T15:55:17.397Z",
   "questions": [
     {
       "id": "jlpt18-n2-001",
@@ -113,6 +113,1041 @@
       "explanation": "",
       "source": "JLPT官方問題例2018 N2 問題6 q28",
       "createdAt": 1794839160589
+    },
+    {
+      "id": "jlpt18-n1-001",
+      "level": "N1",
+      "type": [
+        "P1",
+        "KANJI_READING"
+      ],
+      "prompt": "社会活動に参加することで、人脈を広げることができた。",
+      "choices": [
+        "じんみゃく",
+        "じんまく",
+        "にんみゃく",
+        "にんまく"
+      ],
+      "answer": 0,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題1 q1",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-002",
+      "level": "N1",
+      "type": [
+        "P1",
+        "KANJI_READING"
+      ],
+      "prompt": "鈴木さんは指摘がいつも的確で、本当に賢い人だと思う。",
+      "choices": [
+        "するどい",
+        "かしこい",
+        "すごい",
+        "えらい"
+      ],
+      "answer": 1,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題1 q2",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-003",
+      "level": "N1",
+      "type": [
+        "P1",
+        "KANJI_READING"
+      ],
+      "prompt": "文化の違いが食生活に顕著に現れている。",
+      "choices": [
+        "げんちょ",
+        "けんしょ",
+        "けんちょ",
+        "げんしょ"
+      ],
+      "answer": 2,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題1 q3",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-004",
+      "level": "N1",
+      "type": [
+        "P1",
+        "KANJI_READING"
+      ],
+      "prompt": "相談の内容は多岐にわたった。",
+      "choices": [
+        "たき",
+        "たじ",
+        "たぎ",
+        "たし"
+      ],
+      "answer": 0,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題1 q4",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-005",
+      "level": "N1",
+      "type": [
+        "P1",
+        "KANJI_READING"
+      ],
+      "prompt": "その風習は、今はもう廃れてしまった。",
+      "choices": [
+        "くずれて",
+        "かすれて",
+        "つぶれて",
+        "すたれて"
+      ],
+      "answer": 3,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題1 q5",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-006",
+      "level": "N1",
+      "type": [
+        "P1",
+        "KANJI_READING"
+      ],
+      "prompt": "家賃の相場は地域によって違う。",
+      "choices": [
+        "あいば",
+        "そうば",
+        "あいじょう",
+        "そうじょう"
+      ],
+      "answer": 1,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題1 q6",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-007",
+      "level": "N1",
+      "type": [
+        "P2",
+        "VOCAB_FILL"
+      ],
+      "prompt": "私はこの土地で定職に就き、生活の（　）を築いた。",
+      "choices": [
+        "根拠",
+        "基盤",
+        "根源",
+        "基地"
+      ],
+      "answer": 1,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題2 q7",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-008",
+      "level": "N1",
+      "type": [
+        "P2",
+        "VOCAB_FILL"
+      ],
+      "prompt": "議論は難航すると思ったが、すぐに意見がまとまり、（　）結論が出た。",
+      "choices": [
+        "すんなり",
+        "うっとり",
+        "ふんわり",
+        "こっそり"
+      ],
+      "answer": 0,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題2 q8",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-009",
+      "level": "N1",
+      "type": [
+        "P2",
+        "VOCAB_FILL"
+      ],
+      "prompt": "さっき駅前で佐藤さんを（　）んですが、今、海外にいるはずなのに変ですね。",
+      "choices": [
+        "見合わせた",
+        "見過ごした",
+        "見かけた",
+        "見違えた"
+      ],
+      "answer": 2,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題2 q9",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-010",
+      "level": "N1",
+      "type": [
+        "P2",
+        "VOCAB_FILL"
+      ],
+      "prompt": "市長の責任ある行動が住民の不安を（　）し、行政に対する期待が一気に高まった。",
+      "choices": [
+        "一掃",
+        "追放",
+        "削除",
+        "排出"
+      ],
+      "answer": 0,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題2 q10",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-011",
+      "level": "N1",
+      "type": [
+        "P2",
+        "VOCAB_FILL"
+      ],
+      "prompt": "十分に煮た野菜は味が（　）柔らかく、とてもおいしかった。",
+      "choices": [
+        "溶けて",
+        "染みて",
+        "潤って",
+        "沈んで"
+      ],
+      "answer": 1,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題2 q11",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-012",
+      "level": "N1",
+      "type": [
+        "P2",
+        "VOCAB_FILL"
+      ],
+      "prompt": "このテーブルは私が子どものころから使っているので、（　）があって捨てられない。",
+      "choices": [
+        "心情",
+        "好感",
+        "熱意",
+        "愛着"
+      ],
+      "answer": 3,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題2 q12",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-013",
+      "level": "N1",
+      "type": [
+        "P2",
+        "VOCAB_FILL"
+      ],
+      "prompt": "現社長は創立者から経営の（　）を学んだ。",
+      "choices": [
+        "データベース",
+        "ベテラン",
+        "ライフワーク",
+        "ノウハウ"
+      ],
+      "answer": 3,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題2 q13",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-014",
+      "level": "N1",
+      "type": [
+        "P3",
+        "PARAPHRASE"
+      ],
+      "prompt": "高橋さんにはかねがねお会いしたいと思っていました。",
+      "choices": [
+        "直接",
+        "ぜひ",
+        "早く",
+        "以前から"
+      ],
+      "answer": 3,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題3 q14",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-015",
+      "level": "N1",
+      "type": [
+        "P3",
+        "PARAPHRASE"
+      ],
+      "prompt": "林さんはそれを故意に捨てたらしい。",
+      "choices": [
+        "わざと",
+        "うっかり",
+        "いやいや",
+        "さっさと"
+      ],
+      "answer": 0,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題3 q15",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-016",
+      "level": "N1",
+      "type": [
+        "P3",
+        "PARAPHRASE"
+      ],
+      "prompt": "昨日、鈴木さんにおわびした。",
+      "choices": [
+        "文句を言った",
+        "お礼を言った",
+        "断った",
+        "謝った"
+      ],
+      "answer": 3,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題3 q16",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-017",
+      "level": "N1",
+      "type": [
+        "P3",
+        "PARAPHRASE"
+      ],
+      "prompt": "中村さんの言葉からは強い意気込みが伝わってくる。",
+      "choices": [
+        "敬意",
+        "自信",
+        "意欲",
+        "信頼"
+      ],
+      "answer": 2,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題3 q17",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-018",
+      "level": "N1",
+      "type": [
+        "P3",
+        "PARAPHRASE"
+      ],
+      "prompt": "妹は少しおびえているようだった。",
+      "choices": [
+        "焦って",
+        "怖がって",
+        "悩んで",
+        "悔やんで"
+      ],
+      "answer": 1,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題3 q18",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-019",
+      "level": "N1",
+      "type": [
+        "P3",
+        "PARAPHRASE"
+      ],
+      "prompt": "私はその一言に安堵した。",
+      "choices": [
+        "すっとした",
+        "はっとした",
+        "ほっとした",
+        "かっとした"
+      ],
+      "answer": 2,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題3 q19",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-020",
+      "level": "N1",
+      "type": [
+        "P4",
+        "USAGE"
+      ],
+      "prompt": "次の言葉の使い方として最もよいものを、１・２・３・４から一つ選びなさい。\n閑静",
+      "choices": [
+        "そのレストランは繁華街から外れた閑静な場所にある。",
+        "今日は朝から具合が悪かったので、会社を休んで家で閑静にしていた。",
+        "用事が早く済み、閑静な時間ができたので、映画を見に行くことにした。",
+        "日中はにぎやかな公園だが、夜になると急に閑静になる。"
+      ],
+      "answer": 0,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題4 q20",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-021",
+      "level": "N1",
+      "type": [
+        "P4",
+        "USAGE"
+      ],
+      "prompt": "次の言葉の使い方として最もよいものを、１・２・３・４から一つ選びなさい。\nたやすい",
+      "choices": [
+        "弟は寝坊したらしく、たやすい物だけ食べて、慌てて出かけていった。",
+        "伊藤氏とは大学時代からの親友で、本音が言えるたやすい関係だ。",
+        "せっかくの日曜日だから、ゆっくり休んでたやすく過ごそうと思う。",
+        "この問題は想像以上に複雑で、たやすく解決できるものではなかった。"
+      ],
+      "answer": 3,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題4 q21",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-022",
+      "level": "N1",
+      "type": [
+        "P4",
+        "USAGE"
+      ],
+      "prompt": "次の言葉の使い方として最もよいものを、１・２・３・４から一つ選びなさい。\n察する",
+      "choices": [
+        "医師たちはチームを組み、意見を出し合って、最良の治療法を察した。",
+        "気象予報士はテレビの天気予報で、来週の気温の変化を察し始めた。",
+        "鈴木さんは、私が何も言わなくても、私の気持ちを察して慰めてくれた。",
+        "外を歩いていたら急にいいアイディアを察したので、手帳にメモをした。"
+      ],
+      "answer": 2,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題4 q22",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-023",
+      "level": "N1",
+      "type": [
+        "P4",
+        "USAGE"
+      ],
+      "prompt": "次の言葉の使い方として最もよいものを、１・２・３・４から一つ選びなさい。\n内訳",
+      "choices": [
+        "来週の内訳を確認したが、予定がないのは木曜の夜だけだ。",
+        "前回の出張費の内訳を見たら、交通費の割合が予想外に高かった。",
+        "司会者は進行を間違えないように、式の内訳を何度も見直した。",
+        "家族の健康のため、栄養の内訳を考えて食事を作っている。"
+      ],
+      "answer": 1,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題4 q23",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-024",
+      "level": "N1",
+      "type": [
+        "P4",
+        "USAGE"
+      ],
+      "prompt": "次の言葉の使い方として最もよいものを、１・２・３・４から一つ選びなさい。\n食い違う",
+      "choices": [
+        "この事件は、複数の目撃者の話がそれぞれ食い違っており、不明な点が多い。",
+        "金庫を開けようと思ったが、どの鍵も食い違って開けられなかった。",
+        "何だか歩きにくいと思ったら、サンダルの左右が食い違っていた。",
+        "調味料を変えたのか、この料理はいつもと味が食い違っているように感じる。"
+      ],
+      "answer": 0,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題4 q24",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n1-025",
+      "level": "N1",
+      "type": [
+        "P4",
+        "USAGE"
+      ],
+      "prompt": "次の言葉の使い方として最もよいものを、１・２・３・４から一つ選びなさい。\n過密",
+      "choices": [
+        "雑誌で紹介されてから、この商品への過密な注文が続いているらしい。",
+        "水質汚染に関して人々の抗議が過密になり、政府は対策を迫られている。",
+        "今回の出張は過密なスケジュールで、ゆっくり食事する時間もなさそうだ。",
+        "春になると、この池の周りには、色とりどりの花が過密に咲き乱れる。"
+      ],
+      "answer": 2,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N1 問題4 q25",
+      "createdAt": 1794844451696
+    },
+    {
+      "id": "jlpt18-n3-001",
+      "level": "N3",
+      "type": "KANJI_READING",
+      "prompt": "会場には大勢の観客がいた。",
+      "choices": [
+        "けんぎゃく",
+        "かんぎゃく",
+        "けんきゃく",
+        "かんきゃく"
+      ],
+      "answer": 3,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題1 q1",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-002",
+      "level": "N3",
+      "type": "KANJI_READING",
+      "prompt": "田村さんが払ってくれました。",
+      "choices": [
+        "くばって",
+        "はらって",
+        "かざって",
+        "ひろって"
+      ],
+      "answer": 1,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題1 q2",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-003",
+      "level": "N3",
+      "type": "KANJI_READING",
+      "prompt": "ホテルには３時ごろ到着します。",
+      "choices": [
+        "とうちゃく",
+        "とうつく",
+        "とちゃく",
+        "とつく"
+      ],
+      "answer": 0,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題1 q3",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-004",
+      "level": "N3",
+      "type": "KANJI_READING",
+      "prompt": "山下さんが説明を加えました。",
+      "choices": [
+        "つたえました",
+        "おえました",
+        "くわえました",
+        "かえました"
+      ],
+      "answer": 2,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題1 q4",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-005",
+      "level": "N3",
+      "type": "KANJI_READING",
+      "prompt": "今から訓練を行います。",
+      "choices": [
+        "くんれい",
+        "くんれん",
+        "ぐんれい",
+        "ぐんれん"
+      ],
+      "answer": 1,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題1 q5",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-006",
+      "level": "N3",
+      "type": "KANJI_READING",
+      "prompt": "この豆はスープに使うといいですよ。",
+      "choices": [
+        "こな",
+        "いも",
+        "かい",
+        "まめ"
+      ],
+      "answer": 3,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題1 q6",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-007",
+      "level": "N3",
+      "type": "KANJI_READING",
+      "prompt": "社会には共通のルールがあります。",
+      "choices": [
+        "きょうつ",
+        "こうつう",
+        "きょうつう",
+        "こうつ"
+      ],
+      "answer": 2,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題1 q7",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-008",
+      "level": "N3",
+      "type": "KANJI_READING",
+      "prompt": "来年から税金が上がるそうだ。",
+      "choices": [
+        "ぜいきん",
+        "ぜっきん",
+        "せいきん",
+        "せっきん"
+      ],
+      "answer": 0,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題1 q8",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-009",
+      "level": "N3",
+      "type": "KANJI_WRITING",
+      "prompt": "しばらく、きれいななみを見ていた。",
+      "choices": [
+        "池",
+        "湖",
+        "港",
+        "波"
+      ],
+      "answer": 3,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題2 q9",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-010",
+      "level": "N3",
+      "type": "KANJI_WRITING",
+      "prompt": "もう少しはやく歩きましょう。",
+      "choices": [
+        "軽く",
+        "急く",
+        "速く",
+        "進く"
+      ],
+      "answer": 2,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題2 q10",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-011",
+      "level": "N3",
+      "type": "KANJI_WRITING",
+      "prompt": "わたしは今の生活にまんぞくしている。",
+      "choices": [
+        "満続",
+        "万続",
+        "満足",
+        "万足"
+      ],
+      "answer": 2,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題2 q11",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-012",
+      "level": "N3",
+      "type": "KANJI_WRITING",
+      "prompt": "父は腕をくんで何か考えていた。",
+      "choices": [
+        "接んで",
+        "組んで",
+        "折んで",
+        "結んで"
+      ],
+      "answer": 1,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題2 q12",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-013",
+      "level": "N3",
+      "type": "KANJI_WRITING",
+      "prompt": "この国は主に米をゆしゅつしている。",
+      "choices": [
+        "輸出",
+        "諭出",
+        "輪出",
+        "論出"
+      ],
+      "answer": 0,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題2 q13",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-014",
+      "level": "N3",
+      "type": "KANJI_WRITING",
+      "prompt": "赤ちゃんが母親に抱かれてねむっています。",
+      "choices": [
+        "寝って",
+        "宿って",
+        "眼って",
+        "眠って"
+      ],
+      "answer": 3,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題2 q14",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-015",
+      "level": "N3",
+      "type": "VOCAB_FILL",
+      "prompt": "この紙は、ぬれても破れにくいという（　）があります。",
+      "choices": [
+        "実力",
+        "特長",
+        "専門",
+        "主張"
+      ],
+      "answer": 1,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題3 q15",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-016",
+      "level": "N3",
+      "type": "VOCAB_FILL",
+      "prompt": "佐藤さんには、おとなしい（　）があるが、本当は活動的な人らしい。",
+      "choices": [
+        "ヒント",
+        "タイトル",
+        "アイディア",
+        "イメージ"
+      ],
+      "answer": 3,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題3 q16",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-017",
+      "level": "N3",
+      "type": "VOCAB_FILL",
+      "prompt": "正月には親戚が集まって、みんなでテーブルを（　）、楽しく食事をした。",
+      "choices": [
+        "囲み",
+        "通し",
+        "包み",
+        "越え"
+      ],
+      "answer": 0,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題3 q17",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-018",
+      "level": "N3",
+      "type": "VOCAB_FILL",
+      "prompt": "このレストランの料理はおいしくないで、店内はいつも（　）だ。",
+      "choices": [
+        "ふらふら",
+        "ぐっすり",
+        "がらがら",
+        "うっかり"
+      ],
+      "answer": 2,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題3 q18",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-019",
+      "level": "N3",
+      "type": "VOCAB_FILL",
+      "prompt": "高田さんが引っ越すという（　）を聞いたが、本当かどうか気になる。",
+      "choices": [
+        "うわさ",
+        "宣伝",
+        "うそ",
+        "冗談"
+      ],
+      "answer": 0,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題3 q19",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-020",
+      "level": "N3",
+      "type": "VOCAB_FILL",
+      "prompt": "父から借りた本をなくしてしまったので謝ったら、父はすぐに（　）くれた。",
+      "choices": [
+        "従って",
+        "守って",
+        "許して",
+        "抑えて"
+      ],
+      "answer": 2,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題3 q20",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-021",
+      "level": "N3",
+      "type": "VOCAB_FILL",
+      "prompt": "パソコンの前でずっと同じ（　）でいたので、体が痛くなった。",
+      "choices": [
+        "様子",
+        "姿勢",
+        "印象",
+        "間隔"
+      ],
+      "answer": 1,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題3 q21",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-022",
+      "level": "N3",
+      "type": "VOCAB_FILL",
+      "prompt": "申込書に間違いがないか、よく（　）から受付に出した。",
+      "choices": [
+        "くりかえして",
+        "気にして",
+        "見つめて",
+        "たしかめて"
+      ],
+      "answer": 3,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題3 q22",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-023",
+      "level": "N3",
+      "type": "VOCAB_FILL",
+      "prompt": "わたしのふるさとは（　）が盛んで、米や野菜をたくさん作っています。",
+      "choices": [
+        "自然",
+        "資源",
+        "作物",
+        "農業"
+      ],
+      "answer": 3,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題3 q23",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-024",
+      "level": "N3",
+      "type": "VOCAB_FILL",
+      "prompt": "水に浮いていた木の葉が、しばらくすると水の中に（　）しまった。",
+      "choices": [
+        "しずんで",
+        "ころんで",
+        "たおれて",
+        "おぼれて"
+      ],
+      "answer": 0,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題3 q24",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-025",
+      "level": "N3",
+      "type": "VOCAB_FILL",
+      "prompt": "この話は誰にも言わずに、ずっと（　）にしていた。",
+      "choices": [
+        "裏側",
+        "内緒",
+        "後方",
+        "中身"
+      ],
+      "answer": 1,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題3 q25",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-026",
+      "level": "N3",
+      "type": "PARAPHRASE",
+      "prompt": "水の表面がかがやいています。",
+      "choices": [
+        "止まって",
+        "揺れて",
+        "汚れて",
+        "光って"
+      ],
+      "answer": 3,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題4 q26",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-027",
+      "level": "N3",
+      "type": "PARAPHRASE",
+      "prompt": "その知らせを聞いたとき、わたしはとてもがっかりした。",
+      "choices": [
+        "残念だと思った",
+        "うれしかった",
+        "驚いた",
+        "安心した"
+      ],
+      "answer": 0,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題4 q27",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-028",
+      "level": "N3",
+      "type": "PARAPHRASE",
+      "prompt": "留学生活に不安は当然ありました。",
+      "choices": [
+        "いろいろ",
+        "少し",
+        "もちろん",
+        "いつも"
+      ],
+      "answer": 2,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題4 q28",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-029",
+      "level": "N3",
+      "type": "PARAPHRASE",
+      "prompt": "パーティーの料理があまりました。",
+      "choices": [
+        "多すぎて残りました",
+        "少し足りませんでした",
+        "とてもおいしかったです",
+        "そんなにおいしくなかったです"
+      ],
+      "answer": 0,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題4 q29",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-030",
+      "level": "N3",
+      "type": "PARAPHRASE",
+      "prompt": "ここは横断禁止です。",
+      "choices": [
+        "座ってはいけません",
+        "渡ってはいけません",
+        "走ってはいけません",
+        "入ってはいけません"
+      ],
+      "answer": 1,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題4 q30",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-031",
+      "level": "N3",
+      "type": "USAGE",
+      "prompt": "つぎのことばの使い方として最もよいものを、１・２・３・４から一つえらびなさい。\n急",
+      "choices": [
+        "この料理は電子レンジを使って急にできるので、とても簡単だ。",
+        "あと１０分で電車が出発してしまうので、急に駅に向かった。",
+        "部屋から急に人が飛び出してきたので、ぶつかりそうになった。",
+        "新しいゲームを買ったので、家に帰って急にやってみた。"
+      ],
+      "answer": 2,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題5 q31",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-032",
+      "level": "N3",
+      "type": "USAGE",
+      "prompt": "つぎのことばの使い方として最もよいものを、１・２・３・４から一つえらびなさい。\n沸騰",
+      "choices": [
+        "今日は朝からどんどん暑くなり、昼には気温が沸騰した。",
+        "鍋のお湯が沸騰したら、とうふを入れて火を少し弱くしてください。",
+        "昼ごろから具合が悪くなり、夕方熱が沸騰したので病院へ行った。",
+        "このストーブは沸騰するのが早いので、すぐに部屋が暖かくなる。"
+      ],
+      "answer": 1,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題5 q32",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-033",
+      "level": "N3",
+      "type": "USAGE",
+      "prompt": "つぎのことばの使い方として最もよいものを、１・２・３・４から一つえらびなさい。\nまげる",
+      "choices": [
+        "今朝は寒かったので、マフラーを首にまげて出かけた。",
+        "けがは良くなったが、腕を伸ばしたりまげたりすると、まだ少し痛む。",
+        "一つのパンを半分にまげて、二人で分けて食べた。",
+        "シャツをきちんとまげたら、たんすの引き出しにしまってください。"
+      ],
+      "answer": 1,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題5 q33",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-034",
+      "level": "N3",
+      "type": "USAGE",
+      "prompt": "つぎのことばの使い方として最もよいものを、１・２・３・４から一つえらびなさい。\n出張",
+      "choices": [
+        "営業のため、来週一週間、課長とアメリカに出張します。",
+        "仕事を辞めたら、家族とゆっくり海外に出張したいと思う。",
+        "わたしは毎朝９時に会社に出張し、残業はしないで家に帰る。",
+        "あしたは子どもの運動会に出張するので、仕事を休みます。"
+      ],
+      "answer": 0,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題5 q34",
+      "createdAt": 1794844492342
+    },
+    {
+      "id": "jlpt18-n3-035",
+      "level": "N3",
+      "type": "USAGE",
+      "prompt": "つぎのことばの使い方として最もよいものを、１・２・３・４から一つえらびなさい。\n慰める",
+      "choices": [
+        "祖母は古い物でも捨てないで、長い間慰めて使っている。",
+        "試合を見ながら、優勝を願って一生懸命選手を慰めた。",
+        "仕事で失敗してしまったが、友人が慰めてくれたので元気が出た。",
+        "弟が希望の大学に合格したので、家族で外食をして慰めた。"
+      ],
+      "answer": 2,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N3 問題5 q35",
+      "createdAt": 1794844492342
     }
   ]
 }
