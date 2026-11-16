@@ -285,6 +285,16 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
 .kb-item-status { font-size: 12px; }
 
 /* Toast */
+.bank-hit { margin-bottom: 8px; padding: 8px 10px; border-radius: 8px; background: rgba(0,122,255,0.10); color: var(--primary); font-size: 13px; line-height: 1.6; }
+.bank-list { max-height: 34vh; overflow-y: auto; margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.bank-item { display: flex; gap: 8px; align-items: flex-start; padding: 8px 10px; background: var(--card); border: 1px solid var(--sep); border-radius: 8px; font-size: 13px; }
+.bank-item .bi-main { flex: 1; min-width: 0; }
+.bank-item .bi-stem { color: var(--text); line-height: 1.5; word-break: break-all; }
+.bank-item .bi-meta { color: var(--text3); font-size: 12px; margin-top: 2px; word-break: break-all; }
+.bank-item-del { border: none; background: var(--fill); color: var(--text3); border-radius: 50%; width: 24px; height: 24px; flex: none; cursor: pointer; }
+.bank-import-result { display: none; font-size: 13px; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--fill); color: var(--text2); line-height: 1.6; }
+.bank-import-result.show { display: block; }
+.bs-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8); background: rgba(0,0,0,0.75); color: #fff; padding: 10px 20px; border-radius: 10px; font-size: 14px; z-index: 999; opacity: 0; transition: all 0.25s ease; pointer-events: none; }
 .toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
@@ -304,6 +314,7 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
     <button class="header-btn" id="btnSidebar" aria-label="历史会话">☰</button>
     <div class="header-title">語師 <span id="modeLabel">问答</span></div>
     <div class="header-btns">
+      <button class="header-btn" id="btnBank" aria-label="真题库" title="真题库">🗂️</button>
       <button class="header-btn" id="btnKB" aria-label="知识库" title="知识库">📚</button>
       <button class="header-btn" id="btnSettings" aria-label="设置">⚙</button>
     </div>
@@ -471,6 +482,71 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
 </div>
 
 <!-- History Sidebar -->
+<div class="modal-overlay" id="bankModal">
+  <div class="modal" style="position:relative;">
+    <button class="modal-close" id="closeBank">✕</button>
+    <h3>🗂️ 真题库</h3>
+    <div class="setting-hint" id="bankCount" style="margin-bottom:12px;"></div>
+    <div class="setting-group">
+      <div class="setting-label">导入</div>
+      <button class="setting-btn secondary" id="bankImportFile" style="margin-top:0;">📄 导入 JSON / 文本文件</button>
+      <input type="file" id="bankFile" accept=".json,.txt,application/json,text/plain" class="hidden">
+      <textarea class="setting-input" id="bankPaste" rows="6" style="margin-top:8px;line-height:1.6;" placeholder="或粘贴内容（文本格式）：&#10;题：彼は社長に就任する（　　）、改革に着手した。&#10;1 や否や&#10;2 ものの&#10;3 ことなく&#10;4 ながらも&#10;答案：1&#10;解析：…&#10;来源：书名 p页 题号&#10;（多题用 --- 分隔；也支持 Open-JLPT 格式 JSON）"></textarea>
+      <button class="setting-btn primary" id="bankImportPaste">导入粘贴内容</button>
+      <div class="bank-import-result" id="bankImportResult"></div>
+      <div class="setting-hint">导入即校验：选项 3–4 个、答案在范围内、id 唯一且不复用。题库只存本机浏览器，不上传、不进 git。</div>
+    </div>
+    <button class="setting-btn secondary" id="bankExport">⬇️ 导出题库 JSON（本机备份/换机迁移）</button>
+    <div class="bank-list" id="bankList"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="bankSaveModal">
+  <div class="modal" style="position:relative;">
+    <button class="modal-close" id="closeBankSave">✕</button>
+    <h3>💾 存入真题库</h3>
+    <div class="setting-group">
+      <div class="setting-label">级别 / 题型</div>
+      <div style="display:flex;gap:6px;">
+        <select class="setting-select" id="bsLevel" style="flex:0 0 90px;">
+          <option value="">未定</option><option>N5</option><option>N4</option><option>N3</option><option>N2</option><option>N1</option>
+        </select>
+        <input class="setting-input" id="bsType" placeholder="题型（如 文法 / 漢字読み）">
+      </div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">题干</div>
+      <textarea class="setting-input" id="bsPrompt" rows="4" style="line-height:1.6;"></textarea>
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">选项（按顺序填，空位跳过）</div>
+      <div class="bs-choices">
+        <input class="setting-input" id="bsC1" placeholder="1">
+        <input class="setting-input" id="bsC2" placeholder="2">
+        <input class="setting-input" id="bsC3" placeholder="3">
+        <input class="setting-input" id="bsC4" placeholder="4">
+      </div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">正确答案</div>
+      <select class="setting-select" id="bsAnswer">
+        <option value="">请选择</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
+      </select>
+      <div class="setting-hint" id="bsHint"></div>
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">解析（可留空，命中后由模型生成）</div>
+      <textarea class="setting-input" id="bsExpl" rows="4" style="line-height:1.6;"></textarea>
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">来源（书名 · 页 · 题号）</div>
+      <input class="setting-input" id="bsSource" placeholder="如：新完全掌握N2文法 p12 q3">
+    </div>
+    <button class="setting-btn primary" id="bankSaveConfirm">存入</button>
+    <button class="setting-btn secondary" id="bankSaveCancel">取消</button>
+  </div>
+</div>
+
 <div class="sidebar-overlay" id="sidebarOverlay"></div>
 <div class="sidebar" id="sidebar">
   <div class="sidebar-header">
@@ -1107,6 +1183,31 @@ function bindEvents() {
   $('#closeKB').addEventListener('click', () => $('#kbModal').classList.remove('show'));
   $('#kbModal').addEventListener('click', e => { if (e.target === $('#kbModal')) $('#kbModal').classList.remove('show'); });
 
+  $('#btnBank').addEventListener('click', openBank);
+  $('#closeBank').addEventListener('click', () => $('#bankModal').classList.remove('show'));
+  $('#bankModal').addEventListener('click', e => { if (e.target === $('#bankModal')) $('#bankModal').classList.remove('show'); });
+  $('#bankImportFile').addEventListener('click', () => $('#bankFile').click());
+  $('#bankFile').addEventListener('change', async e => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    try { await bankImport(await f.text()); } catch (err) { showToast('导入失败：' + (err.message || '请重试')); }
+  });
+  $('#bankImportPaste').addEventListener('click', () => bankImport($('#bankPaste').value).catch(err => showToast('导入失败：' + (err.message || '请重试'))));
+  $('#bankExport').addEventListener('click', () => bankExport().catch(err => showToast('导出失败：' + (err.message || '请重试'))));
+  $('#bankList').addEventListener('click', async e => {
+    const del = e.target.closest('[data-bank-del]');
+    if (!del) return;
+    if (!confirm('删除这道题？删除后不可恢复。')) return;
+    await bankDelete(del.dataset.bankDel);
+    bankInvalidate();
+    renderBank();
+  });
+  $('#closeBankSave').addEventListener('click', () => $('#bankSaveModal').classList.remove('show'));
+  $('#bankSaveCancel').addEventListener('click', () => $('#bankSaveModal').classList.remove('show'));
+  $('#bankSaveModal').addEventListener('click', e => { if (e.target === $('#bankSaveModal')) $('#bankSaveModal').classList.remove('show'); });
+  $('#bankSaveConfirm').addEventListener('click', () => confirmBankSave().catch(err => showToast('存入失败：' + (err.message || '请重试'))));
+
   $('#kDetailModal').addEventListener('click', e => {
     if (e.target === $('#kDetailModal')) $('#kDetailModal').classList.remove('show');
   });
@@ -1120,6 +1221,8 @@ function bindEvents() {
     if (speakMsgBtn) { speakMessage(speakMsgBtn); return; }
     const checkBtn = e.target.closest('[data-check-msg]');
     if (checkBtn) { checkAnswer(checkBtn); return; }
+    const saveBankBtn = e.target.closest('[data-save-bank]');
+    if (saveBankBtn) { openBankSave(saveBankBtn); return; }
     const kchip = e.target.closest('.k-chip');
     if (kchip) { showKnowledgeDetail(kchip.dataset.gid); return; }
     const bubble = e.target.closest('.msg.assistant .msg-bubble');
@@ -1414,14 +1517,17 @@ function renderMessage(msg) {
     content += escHtml(msg.content);
     return `<div class="msg user"><div class="msg-avatar">我</div><div class="msg-bubble">${content}</div></div>`;
   } else {
-    const html = marked.parse(msg.content || '');
-    return `<div class="msg assistant" data-raw="${escAttr(msg.content || '')}"><div class="msg-avatar">師</div><div class="msg-bubble">${html}${msgToolsHtml()}</div></div>`;
+    const html = (msg.bank ? bankHitHtml(msg.bank) : '') + marked.parse(msg.content || '');
+    return `<div class="msg assistant" data-raw="${escAttr(msg.content || '')}"><div class="msg-avatar">師</div><div class="msg-bubble">${html}${msgToolsHtml(msg)}</div></div>`;
   }
 }
 
-function msgToolsHtml() {
-  const check = state.mode === 'exam' ? '<button class="msg-tool" data-check-msg>🔁 复核</button>' : '';
-  return `<div class="msg-tools"><button class="msg-tool" data-speak-msg>🔊 朗读日文</button>${check}</div>`;
+function msgToolsHtml(msg) {
+  const exam = state.mode === 'exam';
+  const inBank = !!(msg && msg.bank);
+  const check = exam && !inBank ? '<button class="msg-tool" data-check-msg>🔁 复核</button>' : '';
+  const save = exam && !inBank ? '<button class="msg-tool" data-save-bank>💾 存题</button>' : '';
+  return `<div class="msg-tools"><button class="msg-tool" data-speak-msg>🔊 朗读日文</button>${check}${save}</div>`;
 }
 
 function appendUserMessage(text, imageData, ocrVerified) {
@@ -1462,12 +1568,15 @@ function showThinkingHint() {
 function updateAssistantBubble(content) {
   const el = document.querySelector('#msg-pending .msg-bubble');
   if (!el) return;
+  const holder = document.getElementById('msg-pending');
+  const notice = holder && holder.dataset.bankHtml;
   el.innerHTML = marked.parse(content || '');
+  if (notice) el.insertAdjacentHTML('afterbegin', notice);
   applyFurigana(el);
   scrollToBottom();
 }
 
-function finalizeAssistantBubble(fullContent) {
+function finalizeAssistantBubble(fullContent, bankInfo) {
   const el = document.getElementById('msg-pending');
   if (el) el.id = '';
   const msgEl = document.querySelector('.msg.assistant:last-child');
@@ -1476,6 +1585,7 @@ function finalizeAssistantBubble(fullContent) {
   if (!bubble) return;
   msgEl.dataset.raw = fullContent || '';
   applyFurigana(bubble);
+  if (bankInfo) bubble.insertAdjacentHTML('afterbegin', bankHitHtml(bankInfo));
   // Detect and add knowledge cards
   if (fullContent) {
     const detected = detectKnowledgeInText(fullContent);
@@ -1485,7 +1595,7 @@ function finalizeAssistantBubble(fullContent) {
       if (cardsDiv.firstElementChild) bubble.appendChild(cardsDiv.firstElementChild);
     }
   }
-  bubble.insertAdjacentHTML('beforeend', msgToolsHtml());
+  bubble.insertAdjacentHTML('beforeend', msgToolsHtml({ bank: bankInfo }));
 }
 
 function scrollToBottom() {
@@ -1681,8 +1791,15 @@ async function sendMessage(opts = {}) {
   appendUserMessage(text, imageData, !!opts.ocrVerified);
 
   const conv = state.conversations[state.currentId];
+  // 真题库命中时答案以库为准，模型只解释
+  let bankHit = null;
+  if (state.mode === 'exam') {
+    try { bankHit = await bankMatch(text); } catch (e) { console.warn('bank match failed:', e); }
+  }
+  let bankInfo = null;
   // Compress system prompt + inject relevant knowledge
   let systemPrompt = SYSTEM_PROMPTS[state.mode];
+  if (bankHit) systemPrompt += bankAuthorityPrompt(bankHit);
   const knowledgeInjection = injectRelevantKnowledge(text, conv.messages);
   if (knowledgeInjection) {
     systemPrompt += knowledgeInjection;
@@ -1709,6 +1826,12 @@ async function sendMessage(opts = {}) {
   }
 
   appendAssistantPlaceholder();
+  if (bankHit) {
+    bankInfo = { id: bankHit.id, answer: bankHit.answer, source: bankHit.source || '', level: bankHit.level || '', choiceTexts: bankHit.choiceTexts || [] };
+    const pend = document.getElementById('msg-pending');
+    pend.dataset.bankHtml = bankHitHtml(bankInfo);
+    pend.querySelector('.msg-bubble').insertAdjacentHTML('afterbegin', pend.dataset.bankHtml);
+  }
   state.generating = true;
   btnSend.innerHTML = '⏹';
   btnSend.disabled = false;
@@ -1772,10 +1895,10 @@ async function sendMessage(opts = {}) {
   }
 
   if (fullContent) {
-    conv.messages.push({ role:'assistant', content: fullContent });
+    conv.messages.push({ role:'assistant', content: fullContent, bank: bankInfo || undefined });
     saveState();
   }
-  finalizeAssistantBubble(fullContent);
+  finalizeAssistantBubble(fullContent, bankInfo);
   state.generating = false;
   state.abortController = null;
   btnSend.innerHTML = '↑';
@@ -2115,6 +2238,296 @@ function clearImage() {
   imagePreview.classList.remove('show');
   previewImg.src = '';
   btnSend.disabled = !inputText.value.trim();
+}
+
+// ─── 真题库（IndexedDB，仅存本机；内容不上传、不进 git） ────────
+const BANK_DB = 'goshi_bank_v1';
+let bankDbPromise = null;
+let bankIndex = null;
+
+function bankDb() {
+  if (!bankDbPromise) {
+    bankDbPromise = new Promise((res, rej) => {
+      const req = indexedDB.open(BANK_DB, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore('questions', { keyPath: 'id' });
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error || new Error('IndexedDB 不可用'));
+    });
+  }
+  return bankDbPromise;
+}
+function bankTx(mode, fn) {
+  return bankDb().then(db => new Promise((res, rej) => {
+    const req = fn(db.transaction('questions', mode).objectStore('questions'));
+    req.onsuccess = () => res(req.result);
+    req.onerror = () => rej(req.error);
+  }));
+}
+const bankAll = () => bankTx('readonly', s => s.getAll()).then(r => r || []);
+const bankPut = q => bankTx('readwrite', s => s.put(q));
+const bankDelete = id => bankTx('readwrite', s => s.delete(id));
+const bankCount = () => bankTx('readonly', s => s.count());
+function bankInvalidate() { bankIndex = null; }
+
+function bankValidate(q) {
+  if (!q.prompt || !q.prompt.trim()) return '题干不能为空';
+  if (!Array.isArray(q.choices) || q.choices.length < 3 || q.choices.length > 4) return '选项需要 3–4 个';
+  if (q.choices.some(c => !String(c).trim())) return '选项不能为空';
+  if (!Number.isInteger(q.answer) || q.answer < 0 || q.answer >= q.choices.length) return '答案必须是 1–' + q.choices.length;
+  return '';
+}
+function bankNewId() { return 'u-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 6); }
+function bankAnswerIndex(raw, n) {
+  const s = String(raw || '').trim();
+  const m = s.match(/([1-4１-４A-Da-d一二三四])/);
+  if (!m) return -1;
+  let a = m[1];
+  const fw = '０１２３４５６７８９';
+  if (fw.includes(a)) a = String(fw.indexOf(a));
+  const cn = { '一':'1', '二':'2', '三':'3', '四':'4' };
+  if (cn[a]) a = cn[a];
+  if (/[A-Da-d]/.test(a)) a = String(a.toUpperCase().charCodeAt(0) - 64);
+  const i = parseInt(a, 10) - 1;
+  return i >= 0 && i < n ? i : -1;
+}
+
+// 文本格式：题：/1..4/答案：/解析：/来源：/级别：/题型：，多题用 --- 分隔
+function bankParseText(txt) {
+  const out = [];
+  for (const block of txt.split(/\n\s*(?:---+|===+)\s*\n/)) {
+    const q = { choices: [], explanation: '', source: '', level: '', type: '' };
+    let cont = null;
+    for (const ln of block.split(/\r?\n/)) {
+      const t = ln.trim();
+      if (!t) continue;
+      let m;
+      if ((m = t.match(/^(?:题|题干|Q)[：:]\s*(.*)$/))) { cont = 'prompt'; q.prompt = (q.prompt ? q.prompt + '\n' : '') + m[1]; continue; }
+      if ((m = t.match(/^(?:答案|答|正解)[：:]\s*(.+)$/))) { cont = null; q.answerRaw = m[1]; continue; }
+      if ((m = t.match(/^(?:解析|解释|说明)[：:]\s*(.*)$/))) { cont = 'explanation'; q.explanation = m[1]; continue; }
+      if ((m = t.match(/^(?:来源|出处)[：:]\s*(.*)$/))) { cont = null; q.source = m[1]; continue; }
+      if ((m = t.match(/^(?:级别|等级)[：:]\s*(N[1-5])/i))) { cont = null; q.level = m[1].toUpperCase(); continue; }
+      if ((m = t.match(/^题型[：:]\s*(.*)$/))) { cont = null; q.type = m[1]; continue; }
+      if ((m = t.match(/^([1-4１-４]|[A-Da-d])[．.、)）:：\s]\s*(.+)$/))) { cont = null; q.choices.push(m[2].trim()); continue; }
+      if (cont) q[cont] = (q[cont] ? q[cont] + '\n' : '') + t;
+    }
+    if (q.prompt && q.prompt.trim()) out.push(q);
+  }
+  return out;
+}
+
+async function bankImport(rawText) {
+  const result = { added: 0, dup: 0, errors: [] };
+  const t = (rawText || '').trim();
+  if (!t) { showToast('没有可导入的内容'); return result; }
+  let items;
+  if (t.startsWith('{') || t.startsWith('[')) {
+    let j;
+    try { j = JSON.parse(t); } catch (e) {
+      result.errors.push('JSON 解析失败：' + e.message);
+      return bankImportReport(result);
+    }
+    const passages = {};
+    for (const p of (j.passages || [])) passages[p.id] = p.text || '';
+    items = (Array.isArray(j) ? j : (j.questions || [])).map(q => Object.assign({}, q, {
+      prompt: ((q.passageId && passages[q.passageId]) ? passages[q.passageId] + '\n' : '') + (q.prompt || ''),
+    }));
+  } else {
+    items = bankParseText(t);
+  }
+  if (!items.length) { result.errors.push('没有解析到任何题目（检查格式）'); return bankImportReport(result); }
+  const existing = new Map((await bankAll()).map(q => [q.id, q]));
+  const seen = new Set();
+  for (let i = 0; i < items.length; i++) {
+    const src = items[i];
+    const choices = (src.choices || []).map(c => String(c).trim()).filter(Boolean);
+    const q = {
+      id: String(src.id || '').trim() || bankNewId(),
+      level: String(src.level || '').toUpperCase(),
+      type: String(src.type || '').trim(),
+      prompt: String(src.prompt || '').trim(),
+      choices,
+      answer: typeof src.answer === 'number' ? src.answer : bankAnswerIndex(src.answerRaw ?? src.answer, choices.length),
+      explanation: String(src.explanation || '').trim(),
+      source: String(src.source || '').trim(),
+      createdAt: Date.now(),
+    };
+    const label = q.id || ('第' + (i + 1) + '题');
+    if (seen.has(q.id)) { result.errors.push(label + '：本批内 id 重复'); continue; }
+    seen.add(q.id);
+    const old = existing.get(q.id);
+    if (old) {
+      const same = old.prompt === q.prompt && JSON.stringify(old.choices) === JSON.stringify(q.choices) && old.answer === q.answer;
+      if (same) { result.dup++; continue; }
+      result.errors.push(label + '：id 已存在且内容不同（id 不可复用，换一个新 id）');
+      continue;
+    }
+    const err = bankValidate(q);
+    if (err) { result.errors.push(label + '：' + err); continue; }
+    await bankPut(q);
+    existing.set(q.id, q);
+    result.added++;
+  }
+  bankInvalidate();
+  return bankImportReport(result);
+}
+function bankImportReport(r) {
+  const el = $('#bankImportResult');
+  const lines = [`导入完成：新增 ${r.added} 题，重复跳过 ${r.dup} 题，拒收 ${r.errors.length} 题。`];
+  for (const e of r.errors.slice(0, 8)) lines.push('⚠️ ' + escHtml(e));
+  if (r.errors.length > 8) lines.push(`…其余 ${r.errors.length - 8} 条略`);
+  el.innerHTML = lines.join('<br>');
+  el.classList.add('show');
+  renderBank();
+  return r;
+}
+
+// 归一化：NFKC、去空白/标点/下划线空位，只留可比对的文字
+function bankNorm(s) {
+  return String(s || '').normalize('NFKC')
+    .replace(/[\s　]+/g, '')
+    .replace(/[、。，．,.！？!?・…‥「」『』"'()（）\[\]【】〔〕＿_★＊*−-]+/g, '')
+    .toLowerCase();
+}
+const BANK_CHOICE_RE = /^\s*([1-4１-４]|[A-Da-d]|[①②③④])[．.、)）:：\s]\s*(.+)$/;
+function bankSplitQuestion(text) {
+  const lines = String(text || '').replace(/^【题目原文（已核对）】\s*/, '').split(/\r?\n/);
+  const stem = [], choices = [];
+  let inChoices = false;
+  for (const ln of lines) {
+    const t = ln.trim();
+    if (!t || /^题号[：:]/.test(t)) continue;
+    const m = t.match(BANK_CHOICE_RE);
+    if (m) { inChoices = true; choices.push(m[2].trim()); continue; }
+    if (!inChoices) stem.push(t);
+  }
+  return { stem: stem.join('\n'), choices };
+}
+function bankDice(a, b) {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const grams = s => { const set = new Set(); for (let i = 0; i < s.length - 1; i++) set.add(s.slice(i, i + 2)); if (s.length === 1) set.add(s); return set; };
+  const A = grams(a), B = grams(b);
+  let inter = 0;
+  for (const g of A) if (B.has(g)) inter++;
+  return 2 * inter / (A.size + B.size);
+}
+async function ensureBankIndex() {
+  if (bankIndex) return bankIndex;
+  const all = await bankAll();
+  bankIndex = all.map(q => ({
+    id: q.id, norm: bankNorm(q.prompt), answer: q.answer,
+    level: q.level || '', source: q.source || '',
+    choiceTexts: q.choices || [], choices: (q.choices || []).map(bankNorm),
+  }));
+  return bankIndex;
+}
+// 双重信号：题干相似度 ＋ 选项重合；只有一套选项时要求题干几乎一致
+async function bankMatch(text) {
+  const idx = await ensureBankIndex();
+  if (!idx.length) return null;
+  const { stem, choices } = bankSplitQuestion(text);
+  const target = bankNorm(stem || text);
+  if (!target) return null;
+  const oc = choices.map(bankNorm).filter(Boolean);
+  let best = null;
+  for (const q of idx) {
+    if (!q.norm) continue;
+    const sim = bankDice(target, q.norm);
+    const contained = target.includes(q.norm) || q.norm.includes(target);
+    let overlap = 0;
+    for (const c of oc) if (q.choices.includes(c)) overlap++;
+    const need = Math.min(oc.length, q.choices.length);
+    const choiceOk = need > 0 && overlap >= need - (need >= 4 ? 1 : 0);
+    const bothChoices = oc.length > 0 && q.choices.length > 0;
+    const hit = bothChoices ? (choiceOk && (sim >= 0.75 || contained)) : sim >= 0.9;
+    const score = sim + (choiceOk ? 0.1 : 0);
+    if (hit && (!best || score > best.score)) best = Object.assign({}, q, { score });
+  }
+  return best;
+}
+function bankHitHtml(b) {
+  const n = (b.answer ?? 0) + 1;
+  const ct = b.choiceTexts && b.choiceTexts[b.answer] ? `（${escHtml(b.choiceTexts[b.answer])}）` : '';
+  const src = b.source ? ` · 来源：${escHtml(b.source)}` : '';
+  return `<div class="bank-hit">📚 真题库命中 · 标准答案 ${n}${ct}${src} · 答案以库为准，解析由模型生成</div>`;
+}
+function bankAuthorityPrompt(b) {
+  const n = b.answer + 1;
+  const ct = b.choiceTexts && b.choiceTexts[b.answer] ? `（${b.choiceTexts[b.answer]}）` : '';
+  return `\n\n【真题库命中·答案权威】本题标准答案为选项 ${n}${ct}${b.source ? '，来源：' + b.source : ''}（教师已核对）。
+你只负责解释：按【逐项排除】表格逐项给硬性依据，说明其余选项为什么错、该选项为什么对，再给【教学提示】。
+禁止提出其他答案、禁止写「不确定」、禁止重新选择。最后一行单独输出：最終答案：${n}`;
+}
+
+async function openBank() {
+  $('#bankModal').classList.add('show');
+  try { await renderBank(); } catch (e) { showToast('题库不可用：' + (e.message || '浏览器不支持 IndexedDB')); }
+}
+async function renderBank() {
+  const all = await bankAll();
+  $('#bankCount').textContent = `共 ${all.length} 题 · 仅存本机浏览器，不上传、不进 git`;
+  $('#bankList').innerHTML = all.length ? all.map(q => `
+    <div class="bank-item">
+      <div class="bi-main">
+        <div class="bi-stem">${escHtml((q.prompt || '').slice(0, 60))}${(q.prompt || '').length > 60 ? '…' : ''}</div>
+        <div class="bi-meta">${escHtml(q.level || '')} ${escHtml(q.type || '')} · 答案 ${(q.answer ?? 0) + 1} · ${escHtml(q.source || '无来源')} · ${escHtml(q.id)}</div>
+      </div>
+      <button class="bank-item-del" data-bank-del="${escAttr(q.id)}">✕</button>
+    </div>`).join('')
+    : '<div class="setting-hint">还没有题。导入 JSON/文本，或在真题解析后点「💾 存题」。</div>';
+}
+async function bankExport() {
+  const all = await bankAll();
+  if (!all.length) { showToast('题库为空'); return; }
+  const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), questions: all }, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `goshi_bank_${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast(`已导出 ${all.length} 题（文件只在你本机）`);
+}
+
+let bankSaveCtx = null;
+function openBankSave(btn) {
+  const msgEl = btn.closest('.msg.assistant');
+  let prev = msgEl.previousElementSibling;
+  while (prev && !prev.classList.contains('user')) prev = prev.previousElementSibling;
+  const qText = prev ? (prev.querySelector('.msg-bubble')?.textContent || '').trim() : '';
+  const raw = msgEl.dataset.raw || '';
+  const { stem, choices } = bankSplitQuestion(qText);
+  const ans = parseAnswer(raw);
+  bankSaveCtx = { btn };
+  $('#bsLevel').value = '';
+  $('#bsType').value = '';
+  $('#bsPrompt').value = stem || qText;
+  for (let i = 1; i <= 4; i++) $('#bsC' + i).value = choices[i - 1] || '';
+  $('#bsAnswer').value = ans && /^[1-4]$/.test(ans) ? ans : '';
+  $('#bsExpl').value = raw.replace(/\n?最終答案[：:].*$/, '').trim().slice(0, 2000);
+  $('#bsSource').value = '';
+  $('#bsHint').textContent = ans ? '答案预填自模型解析，请务必核对后再存入。' : '模型未给确定答案：请老师手动选择正确答案后存入。';
+  $('#bankSaveModal').classList.add('show');
+}
+async function confirmBankSave() {
+  const choices = [1, 2, 3, 4].map(i => $('#bsC' + i).value.trim()).filter(Boolean);
+  const q = {
+    id: bankNewId(),
+    level: $('#bsLevel').value,
+    type: $('#bsType').value.trim(),
+    prompt: $('#bsPrompt').value.trim(),
+    choices,
+    answer: $('#bsAnswer').value ? parseInt($('#bsAnswer').value, 10) - 1 : -1,
+    explanation: $('#bsExpl').value.trim(),
+    source: $('#bsSource').value.trim(),
+    createdAt: Date.now(),
+  };
+  const err = bankValidate(q);
+  if (err) { showToast(err); return; }
+  await bankPut(q);
+  bankInvalidate();
+  $('#bankSaveModal').classList.remove('show');
+  if (bankSaveCtx && bankSaveCtx.btn) { bankSaveCtx.btn.textContent = '✓ 已存'; bankSaveCtx.btn.disabled = true; }
+  showToast(`已存入真题库（共 ${await bankCount()} 题）`);
 }
 
 // ─── Settings ─────────────────────────────────────────────────
