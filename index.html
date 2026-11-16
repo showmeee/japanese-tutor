@@ -1585,7 +1585,7 @@ function finalizeAssistantBubble(fullContent, bankInfo) {
   if (!bubble) return;
   msgEl.dataset.raw = fullContent || '';
   applyFurigana(bubble);
-  if (bankInfo) bubble.insertAdjacentHTML('afterbegin', bankHitHtml(bankInfo));
+  if (bankInfo && !bubble.querySelector('.bank-hit')) bubble.insertAdjacentHTML('afterbegin', bankHitHtml(bankInfo));
   // Detect and add knowledge cards
   if (fullContent) {
     const detected = detectKnowledgeInText(fullContent);
@@ -1797,9 +1797,21 @@ async function sendMessage(opts = {}) {
     try { bankHit = await bankMatch(text); } catch (e) { console.warn('bank match failed:', e); }
   }
   let bankInfo = null;
+  if (bankHit) {
+    // 答案编号按用户当前题目的选项顺序重映射，以选项内容锚定
+    const correctText = (bankHit.choiceTexts || [])[bankHit.answer] || '';
+    const ocrChoices = bankSplitQuestion(text).choices;
+    let dispAnswer = bankHit.answer, dispChoices = bankHit.choiceTexts || [];
+    if (correctText && ocrChoices.length) {
+      const cn = bankNorm(correctText);
+      const idx = ocrChoices.findIndex(c => bankNorm(c) === cn);
+      if (idx >= 0) { dispAnswer = idx; dispChoices = ocrChoices; }
+    }
+    bankInfo = { id: bankHit.id, answer: dispAnswer, source: bankHit.source || '', level: bankHit.level || '', choiceTexts: dispChoices };
+  }
   // Compress system prompt + inject relevant knowledge
   let systemPrompt = SYSTEM_PROMPTS[state.mode];
-  if (bankHit) systemPrompt += bankAuthorityPrompt(bankHit);
+  if (bankInfo) systemPrompt += bankAuthorityPrompt(bankInfo);
   const knowledgeInjection = injectRelevantKnowledge(text, conv.messages);
   if (knowledgeInjection) {
     systemPrompt += knowledgeInjection;
@@ -1826,8 +1838,7 @@ async function sendMessage(opts = {}) {
   }
 
   appendAssistantPlaceholder();
-  if (bankHit) {
-    bankInfo = { id: bankHit.id, answer: bankHit.answer, source: bankHit.source || '', level: bankHit.level || '', choiceTexts: bankHit.choiceTexts || [] };
+  if (bankInfo) {
     const pend = document.getElementById('msg-pending');
     pend.dataset.bankHtml = bankHitHtml(bankInfo);
     pend.querySelector('.msg-bubble').insertAdjacentHTML('afterbegin', pend.dataset.bankHtml);
