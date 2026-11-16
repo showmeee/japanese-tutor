@@ -179,6 +179,11 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
 .msg-tool { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border: none; border-radius: 12px; background: var(--fill); color: var(--text2); font-size: 12px; font-weight: 600; font-family: var(--font); cursor: pointer; transition: all 0.15s; }
 .msg-tool:active { transform: scale(0.95); }
 .msg-tool.speaking { background: var(--primary-light); color: var(--primary); }
+.msg-tool:disabled { opacity: 0.6; }
+.check-result { margin-top: 8px; padding: 8px 10px; border-radius: 8px; font-size: 13px; line-height: 1.6; }
+.check-result.ok { background: rgba(52,199,89,0.12); color: var(--green); }
+.check-result.warn { background: rgba(255,149,0,0.14); color: var(--orange); }
+.check-result.err { background: var(--fill); color: var(--text3); }
 .speak-inline { margin-left: 6px; padding: 1px 6px; border: none; border-radius: 10px; background: var(--fill); font-size: 12px; line-height: 1.6; cursor: pointer; vertical-align: middle; transition: all 0.15s; }
 .speak-inline:active { transform: scale(0.92); }
 .speak-inline.speaking { background: var(--primary-light); }
@@ -395,7 +400,7 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
         <option value="__custom__">自定义…</option>
       </select>
       <input class="setting-input" id="settingModel" placeholder="填写模型名" autocomplete="off" spellcheck="false" style="display:none;margin-top:8px;">
-      <div class="setting-hint">flash 快且支持图片，v4-pro 更强但纯文本；接其他服务时选"自定义"填模型名</div>
+      <div class="setting-hint">flash 快且支持图片，v4-pro 更强但纯文本；拍照题核对识别文字后只发文字，因此也能用 v4-pro 分析。接其他服务时选"自定义"填模型名</div>
     </div>
     <div class="setting-group">
       <div class="setting-label">思考强度</div>
@@ -771,20 +776,22 @@ const SYSTEM_PROMPTS = {
 
   exam: `${COMMON_INSTRUCTION}
 
-你是JLPT命题研究专家，精通N5-N1各级别考点和常见陷阱。
+你是JLPT命题研究专家。解题必须「先排除、后选择」，禁止边试边答、禁止先给答案再找理由。
 
-分析流程：
-1. 【题型识别】判断题型（语法/词汇/读解）和级别
-2. 【考点定位】指出考什么语法点
-3. 【陷阱识别】⚠️ 主动思考：这道题的陷阱在哪？常见错误答案是什么？
-4. 【自我验证】在给出答案前，反问自己：这个答案有没有例外情况？
-5. 【逐项分析】每个选项✓/✗，说明原因
-6. 【正确答案】给答案+确信度（高/中/低）+ 验证理由
-7. 【教学建议】如何避免这类错误
-8. 若用户消息含【题目原文（已核对）】，以该文字为准，图片只用于确认版式；两者冲突时以文字为准
-9. 题干或选项不完整时明确指出缺什么，不要臆测补全
+严格按以下顺序输出：
+1. 【题目】题型、级别、考点（一句话）
+2. 【逐项排除】表格，每个选项一行：
+   | 选项 | 接续是否成立 | 语义/语感是否吻合 | 与题干哪一句冲突 | 结论 |
+   每行必须给硬性依据：引用题干原文片段，或写明接续规则。禁止用「感觉/应该/一般来说/通常」当理由。
+3. 【唯一保留项】说明为什么只剩它；再自检一次：这个答案在什么情况下会错？
+4. 【教学提示】这类题的陷阱与避免方法（1-2句）
+5. 最后一行单独输出：最終答案：X（X 只写一个选项编号）
 
-所有日语标假名：漢字[かんじ]，Markdown格式。`,
+约束：
+- 依据不足、无法排除到只剩一项时，明确写「依据不足」，不要硬选；此时最后一行写 最終答案：不确定
+- 若用户消息含【题目原文（已核对）】，以该文字为准，图片只用于确认版式；冲突时以文字为准
+- 题干或选项不完整时指出缺什么，不要臆测补全
+- 所有日语标假名：漢字[かんじ]，Markdown格式`,
 
   summary: `${COMMON_INSTRUCTION}
 
@@ -1111,6 +1118,8 @@ function bindEvents() {
     if (speakTextBtn) { ExampleAudio.play(speakTextBtn.dataset.exampleId, speakTextBtn); return; }
     const speakMsgBtn = e.target.closest('[data-speak-msg]');
     if (speakMsgBtn) { speakMessage(speakMsgBtn); return; }
+    const checkBtn = e.target.closest('[data-check-msg]');
+    if (checkBtn) { checkAnswer(checkBtn); return; }
     const kchip = e.target.closest('.k-chip');
     if (kchip) { showKnowledgeDetail(kchip.dataset.gid); return; }
     const bubble = e.target.closest('.msg.assistant .msg-bubble');
@@ -1411,13 +1420,14 @@ function renderMessage(msg) {
 }
 
 function msgToolsHtml() {
-  return '<div class="msg-tools"><button class="msg-tool" data-speak-msg>🔊 朗读日文</button></div>';
+  const check = state.mode === 'exam' ? '<button class="msg-tool" data-check-msg>🔁 复核</button>' : '';
+  return `<div class="msg-tools"><button class="msg-tool" data-speak-msg>🔊 朗读日文</button>${check}</div>`;
 }
 
-function appendUserMessage(text, imageData) {
+function appendUserMessage(text, imageData, ocrVerified) {
   ensureConversation();
   const conv = state.conversations[state.currentId];
-  const msg = { role:'user', content: text, image: imageData || null };
+  const msg = { role:'user', content: text, image: imageData || null, ocr: !!ocrVerified };
   conv.messages.push(msg);
   if (conv.messages.filter(m => m.role === 'user').length === 1) {
     const titleSrc = text.replace(/^【题目原文（已核对）】\s*/, '').trim();
@@ -1657,7 +1667,7 @@ function injectRelevantKnowledge(userText, convMessages) {
 }
 
 // ─── API Call ─────────────────────────────────────────────────
-async function sendMessage() {
+async function sendMessage(opts = {}) {
   const text = inputText.value.trim();
   const imageData = state.pendingImage;
   if (!text && !imageData) return;
@@ -1668,7 +1678,7 @@ async function sendMessage() {
   btnSend.disabled = true;
   clearImage();
 
-  appendUserMessage(text, imageData);
+  appendUserMessage(text, imageData, !!opts.ocrVerified);
 
   const conv = state.conversations[state.currentId];
   // Compress system prompt + inject relevant knowledge
@@ -1684,7 +1694,8 @@ async function sendMessage() {
   const history = conv.messages.slice(-historyLimit);
   for (const msg of history) {
     if (msg.role === 'user') {
-      if (msg.image) {
+      // 已核对过识别文字的题只发文字，这样纯文本的强模型也能分析
+      if (msg.image && !msg.ocr) {
         apiMessages.push({ role:'user', content:[
           { type:'text', text: msg.content || '请分析这张图片中的日语题目' },
           { type:'image_url', image_url:{ url: msg.image } }
@@ -1706,7 +1717,7 @@ async function sendMessage() {
   // Update token estimate
   updateTokenEstimate(apiMessages);
 
-  const reqBody = { model: state.model, messages: apiMessages, stream: true, temperature: 0.7, max_tokens: 4096 };
+  const reqBody = { model: state.model, messages: apiMessages, stream: true, temperature: state.mode === 'exam' ? 0.2 : 0.7, max_tokens: 4096 };
   if (/deepseek\.com/.test(state.apiBase)) {
     if (state.reasoningEffort === 'none') {
       reqBody.thinking = { type: 'disabled' };
@@ -1971,21 +1982,33 @@ function startOcr(dataUrl) {
 }
 
 async function ocrImage(dataUrl) {
+  const raw = await chatOnce([
+    { role:'system', content: OCR_PROMPT },
+    { role:'user', content:[
+      { type:'text', text:'请转录这张图片里的日语题目。' },
+      { type:'image_url', image_url:{ url: dataUrl } },
+    ]},
+  ], { temperature: 0, maxTokens: 2000, thinking: false });
+  return raw.replace(/^```[a-z]*\n?/i, '').replace(/```$/, '').trim();
+}
+
+// 非流式单次请求，用于 OCR 与独立复核
+async function chatOnce(messages, opts = {}) {
   const reqBody = {
     model: state.model,
-    messages: [
-      { role:'system', content: OCR_PROMPT },
-      { role:'user', content:[
-        { type:'text', text:'请转录这张图片里的日语题目。' },
-        { type:'image_url', image_url:{ url: dataUrl } },
-      ]},
-    ],
+    messages,
     stream: false,
-    temperature: 0,
-    max_tokens: 2000,
+    temperature: opts.temperature ?? 0.2,
+    max_tokens: opts.maxTokens || 1200,
   };
-  // 识别不需要推理，强制关闭以降低延迟
-  if (/deepseek\.com/.test(state.apiBase)) reqBody.thinking = { type: 'disabled' };
+  if (/deepseek\.com/.test(state.apiBase)) {
+    if (opts.thinking === false || state.reasoningEffort === 'none') {
+      reqBody.thinking = { type: 'disabled' };
+    } else {
+      reqBody.thinking = { type: 'enabled' };
+      reqBody.reasoning_effort = state.reasoningEffort;
+    }
+  }
   const resp = await fetch(state.apiBase + '/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + state.apiKey },
@@ -1997,8 +2020,66 @@ async function ocrImage(dataUrl) {
   }
   const json = await resp.json();
   const c = json.choices?.[0]?.message?.content;
-  const raw = typeof c === 'string' ? c : Array.isArray(c) ? c.map(p => p.text || '').join('') : '';
-  return raw.replace(/^```[a-z]*\n?/i, '').replace(/```$/, '').trim();
+  return typeof c === 'string' ? c : Array.isArray(c) ? c.map(p => p.text || '').join('') : '';
+}
+
+function parseAnswer(text) {
+  const m = (text || '').match(/(?:最終答案|正确答案|答案)[：:\s]*(?:选项)?\s*([0-9０-９A-Da-d一二三四])/);
+  if (!m) return null;
+  let a = m[1];
+  const fw = '０１２３４５６７８９';
+  if (fw.includes(a)) a = String(fw.indexOf(a));
+  const cn = { '一':'1', '二':'2', '三':'3', '四':'4' };
+  if (cn[a]) a = cn[a];
+  return a.toUpperCase();
+}
+
+async function checkAnswer(btn) {
+  const msgEl = btn.closest('.msg.assistant');
+  if (!msgEl) return;
+  const firstRaw = msgEl.dataset.raw || '';
+  let prev = msgEl.previousElementSibling;
+  while (prev && !prev.classList.contains('user')) prev = prev.previousElementSibling;
+  if (!prev) { showToast('找不到对应的题目'); return; }
+  const bubble = prev.querySelector('.msg-bubble');
+  const qText = bubble ? bubble.textContent.trim() : '';
+  const imgEl = prev.querySelector('.msg-image');
+  const userContent = qText || (imgEl ? [
+    { type:'text', text:'请分析这张图片中的日语题目' },
+    { type:'image_url', image_url:{ url: imgEl.src } },
+  ] : '');
+  if (!userContent) { showToast('这道题没有可复核的内容'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '复核中…';
+  const old = msgEl.querySelector('.check-result');
+  if (old) old.remove();
+  const out = document.createElement('div');
+  try {
+    const text = await chatOnce([
+      { role:'system', content: SYSTEM_PROMPTS.exam + '\n\n这是独立复核：不要参考任何先前答案，重新逐项排除后作答。' },
+      { role:'user', content: userContent },
+    ], { temperature: 0.2, maxTokens: 1500 });
+    const a1 = parseAnswer(firstRaw);
+    const a2 = parseAnswer(text);
+    if (!a1 || !a2) {
+      out.className = 'check-result warn';
+      out.textContent = '⚠️ 至少一次没有给出确定答案（可能依据不足），建议人工核对题干与选项。';
+    } else if (a1 === a2) {
+      out.className = 'check-result ok';
+      out.textContent = `✅ 复核一致：答案 ${a2}`;
+    } else {
+      out.className = 'check-result warn';
+      out.textContent = `⚠️ 两次答案不同：先答 ${a1}，复核 ${a2}。这道题不稳定，建议核对题干与选项。`;
+    }
+    btn.textContent = '重新复核';
+  } catch (e) {
+    out.className = 'check-result err';
+    out.textContent = '复核失败：' + (e.message || '请重试');
+    btn.textContent = '重试复核';
+  }
+  msgEl.querySelector('.msg-bubble').appendChild(out);
+  btn.disabled = false;
 }
 
 function setOcrState(kind, msg) {
@@ -2026,7 +2107,7 @@ function submitOcr() {
   closeOcr();
   inputText.value = `【题目原文（已核对）】\n${txt}`;
   inputText.dispatchEvent(new Event('input', { bubbles: true }));
-  sendMessage();
+  sendMessage({ ocrVerified: true });
 }
 
 function clearImage() {
@@ -2187,7 +2268,7 @@ function showToast(text) {
 
 function copyMessage(bubble) {
   const clone = bubble.cloneNode(true);
-  clone.querySelectorAll('.msg-tools, .k-cards, rt').forEach(n => n.remove());
+  clone.querySelectorAll('.msg-tools, .k-cards, .check-result, rt').forEach(n => n.remove());
   const text = clone.textContent.trim();
   if (!text) return;
   navigator.clipboard.writeText(text).then(() => showToast('已复制')).catch(() => {});
