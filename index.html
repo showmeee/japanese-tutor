@@ -852,19 +852,30 @@ const SYSTEM_PROMPTS = {
 
   exam: `${COMMON_INSTRUCTION}
 
-你是JLPT命题研究专家。解题必须「先排除、后选择」，禁止边试边答、禁止先给答案再找理由。
+你是JLPT命题研究专家、资深日语教师。解题必须「先排除、后选择」，禁止边试边答、禁止先给答案再找理由。
+
+【分题型解题协议】先判题型，再执行对应动作：
+- 语法形式选择：①先判各选项接续（最客观，先排除）②再判语义·时体 ③最后判主语一致与敬语方向
+- 排序题：先重组完整句子验证语法链，通读后再数★位置
+- 文章语法：空前后句的逻辑关系（逆接/因果/换言）优先；指示词必须找到所指
+- 词汇填空/近义替换：查词性、语义方向、搭配主语（人/物/抽象）；替换后原句意思必须不变
+- 词汇用法：查搭配主语、及物性、语域；正确句必须语义完整自然
+- 汉字读音/表记：警惕长音促音浊音、送假名位置、同音异字；不确定的词明确标出，不猜
+- 阅读：每个选项必须定位并引用原文证据句，无证据的排除；答案是证据句的同义转述不是推理；警惕转折词（しかし/つまり）、范围扩大、极端表述、偷换主语
+- 信息检索：逐条件核对（日期/价格/对象），任一条件不符即排除，注意例外条款
 
 严格按以下顺序输出：
 1. 【题目】题型、级别、考点（一句话）
 2. 【逐项排除】表格，每个选项一行：
-   | 选项 | 接续是否成立 | 语义/语感是否吻合 | 与题干哪一句冲突 | 结论 |
-   每行必须给硬性依据：引用题干原文片段，或写明接续规则。禁止用「感觉/应该/一般来说/通常」当理由。
-3. 【唯一保留项】说明为什么只剩它；再自检一次：这个答案在什么情况下会错？
+   | 选项 | 接续/搭配是否成立 | 语义是否吻合 | 证据或冲突（引用题干原文） | 结论 |
+   每行必须给硬性依据：引用题干原文片段，或写明接续/搭配规则。禁止用「感觉/应该/一般来说/通常」当理由。
+3. 【唯一保留项】为什么只剩它；把答案代入原句通读验证自然度；再自检：这个答案在什么情况下会错？
 4. 【教学提示】这类题的陷阱与避免方法（1-2句）
-5. 最后一行单独输出：最終答案：X（X 只写一个选项编号）
+5. 倒数第二行单独输出：置信度：高/中/低（高＝硬依据充分；中＝有依据但依赖语义判断；低＝依据不足或词不认识）
+6. 最后一行单独输出：最終答案：X（X 只写一个选项编号）
 
 约束：
-- 依据不足、无法排除到只剩一项时，明确写「依据不足」，不要硬选；此时最后一行写 最終答案：不确定
+- 依据不足、无法排除到只剩一项时，写 置信度：低，最后一行写 最終答案：不确定，不要硬选
 - 若用户消息含【题目原文（已核对）】，以该文字为准，图片只用于确认版式；冲突时以文字为准
 - 题干或选项不完整时指出缺什么，不要臆测补全
 - 所有日语标假名：漢字[かんじ]，Markdown格式`,
@@ -1519,7 +1530,8 @@ function renderMessage(msg) {
     return `<div class="msg user"><div class="msg-avatar">我</div><div class="msg-bubble">${content}</div></div>`;
   } else {
     const html = (msg.bank ? bankHitHtml(msg.bank) : '') + marked.parse(msg.content || '');
-    return `<div class="msg assistant" data-raw="${escAttr(msg.content || '')}"><div class="msg-avatar">師</div><div class="msg-bubble">${html}${msgToolsHtml(msg)}</div></div>`;
+    const verify = msg.verify ? `<div class="check-result ${msg.verify.kind}">${escHtml(msg.verify.text)}</div>` : '';
+    return `<div class="msg assistant" data-raw="${escAttr(msg.content || '')}"><div class="msg-avatar">師</div><div class="msg-bubble">${html}${verify}${msgToolsHtml(msg)}</div></div>`;
   }
 }
 
@@ -1852,7 +1864,10 @@ async function sendMessage(opts = {}) {
   // Update token estimate
   updateTokenEstimate(apiMessages);
 
-  const reqBody = { model: state.model, messages: apiMessages, stream: true, temperature: state.mode === 'exam' ? 0.2 : 0.7, max_tokens: 4096 };
+  // 准确度优先：刷题的纯文本解题用最强模型；带未核对图片时才需要视觉模型
+  const hasImage = apiMessages.some(m => Array.isArray(m.content));
+  const solveModel = (state.mode === 'exam' && !hasImage) ? examSolveModel() : state.model;
+  const reqBody = { model: solveModel, messages: apiMessages, stream: true, temperature: state.mode === 'exam' ? 0.2 : 0.7, max_tokens: 4096 };
   if (/deepseek\.com/.test(state.apiBase)) {
     if (state.reasoningEffort === 'none') {
       reqBody.thinking = { type: 'disabled' };
@@ -1910,7 +1925,11 @@ async function sendMessage(opts = {}) {
     conv.messages.push({ role:'assistant', content: fullContent, bank: bankInfo || undefined });
     saveState();
   }
+  const pendingEl = document.getElementById('msg-pending');
   finalizeAssistantBubble(fullContent, bankInfo);
+  if (state.mode === 'exam' && !bankInfo && fullContent && !fullContent.startsWith('**错误**') && !fullContent.includes('（已停止生成）')) {
+    autoVerifyAnswer(pendingEl, conv, conv.messages.length - 1, text, fullContent).catch(e => console.warn('auto verify failed:', e));
+  }
   state.generating = false;
   state.abortController = null;
   btnSend.innerHTML = '↑';
@@ -2130,7 +2149,7 @@ async function ocrImage(dataUrl) {
 // 非流式单次请求，用于 OCR 与独立复核
 async function chatOnce(messages, opts = {}) {
   const reqBody = {
-    model: state.model,
+    model: opts.model || state.model,
     messages,
     stream: false,
     temperature: opts.temperature ?? 0.2,
@@ -2169,6 +2188,51 @@ function parseAnswer(text) {
   return a.toUpperCase();
 }
 
+function parseConfidence(text) {
+  const m = (text || '').match(/置信度[：:\s]*(高|中|低)/);
+  return m ? m[1] : null;
+}
+
+// 准确度优先：解题/复核一律用最强文本模型，flash 只用于拍照 OCR
+function examSolveModel() {
+  return state.model === 'deepseek-flash' ? 'deepseek-v4-pro' : state.model;
+}
+
+// 低置信度或依据不足时自动独立二解；结果持久化到消息，供教师复核
+async function autoVerifyAnswer(msgEl, conv, msgIndex, qText, firstRaw) {
+  const conf = parseConfidence(firstRaw);
+  const a1 = parseAnswer(firstRaw);
+  if (conf !== '低' && a1) return;
+  const bubble = msgEl && msgEl.querySelector('.msg-bubble');
+  if (!bubble) return;
+  const out = document.createElement('div');
+  out.className = 'check-result warn';
+  out.textContent = '⏳ 置信度低，正在独立二解验证…';
+  bubble.appendChild(out);
+  scrollToBottom();
+  try {
+    const text = await chatOnce([
+      { role:'system', content: SYSTEM_PROMPTS.exam + '\n\n这是独立复核：不要参考任何先前答案，重新逐项排除后作答。' },
+      { role:'user', content: qText },
+    ], { temperature: 0.2, maxTokens: 2500, model: examSolveModel() });
+    const a2 = parseAnswer(text);
+    let kind, note;
+    if (a1 && a2 && a1 === a2) { kind = 'ok'; note = `✅ 低置信度二解一致：答案 ${a2}`; }
+    else if (a1 && a2) { kind = 'warn'; note = `⚠️ 两次独立解答不同：先答 ${a1}，二解 ${a2}。建议老师复核后再教学生。`; }
+    else if (!a1 && a2) { kind = 'warn'; note = `⚠️ 首答依据不足，二解给出 ${a2}，仅供参考，建议老师核对。`; }
+    else { kind = 'warn'; note = '⚠️ 两次均依据不足，无法确定答案。请核对题干与选项，或交老师裁决。'; }
+    out.className = 'check-result ' + kind;
+    out.textContent = note;
+    if (conv.messages[msgIndex]) {
+      conv.messages[msgIndex].verify = { kind, text: note };
+      saveState();
+    }
+  } catch (e) {
+    out.className = 'check-result err';
+    out.textContent = '自动二解失败：' + (e.message || '请重试');
+  }
+}
+
 async function checkAnswer(btn) {
   const msgEl = btn.closest('.msg.assistant');
   if (!msgEl) return;
@@ -2194,7 +2258,7 @@ async function checkAnswer(btn) {
     const text = await chatOnce([
       { role:'system', content: SYSTEM_PROMPTS.exam + '\n\n这是独立复核：不要参考任何先前答案，重新逐项排除后作答。' },
       { role:'user', content: userContent },
-    ], { temperature: 0.2, maxTokens: 1500 });
+    ], { temperature: 0.2, maxTokens: 2500, model: typeof userContent === 'string' ? examSolveModel() : undefined });
     const a1 = parseAnswer(firstRaw);
     const a2 = parseAnswer(text);
     if (!a1 || !a2) {
