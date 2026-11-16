@@ -1,9 +1,10 @@
 // 修改 index.html 或任何静态资源后，把 VERSION 加一，让客户端拿到新版本
-const VERSION = 'goshi-v12';
+const VERSION = 'goshi-v13';
 const CORE = [
   './',
   './index.html',
   './manifest.webmanifest',
+  './bank-builtin.json',
   './vendor/marked.min.js',
   './icons/icon-192.png',
   './icons/icon-512.png',

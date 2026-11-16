@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "exportedAt": "2026-11-16T14:28:31.464Z",
+  "questions": [
+    {
+      "id": "jlpt18-n2-001",
+      "level": "N2",
+      "type": "KANJI_READING",
+      "prompt": "先生に貴重な資料を見せていただいた。",
+      "choices": [
+        "きじゅう",
+        "きちょう",
+        "きっじゅう",
+        "きっちょう"
+      ],
+      "answer": 1,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N2 問題1 q1",
+      "createdAt": 1794839160588
+    },
+    {
+      "id": "jlpt18-n2-004",
+      "level": "N2",
+      "type": "KANJI_READING",
+      "prompt": "これは危険を伴う実験だ。",
+      "choices": [
+        "はらう",
+        "あつかう",
+        "ともなう",
+        "すくう"
+      ],
+      "answer": 2,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N2 問題1 q4",
+      "createdAt": 1794839160588
+    },
+    {
+      "id": "jlpt18-n2-007",
+      "level": "N2",
+      "type": "KANJI_WRITING",
+      "prompt": "この商品は安全性がほしょうされている。",
+      "choices": [
+        "補証",
+        "保正",
+        "保証",
+        "補正"
+      ],
+      "answer": 2,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N2 問題2 q7",
+      "createdAt": 1794839160589
+    },
+    {
+      "id": "jlpt18-n2-011",
+      "level": "N2",
+      "type": "CONTEXT",
+      "prompt": "男女の結婚（　　）の違いについて調べた。",
+      "choices": [
+        "観",
+        "識",
+        "念",
+        "察"
+      ],
+      "answer": 0,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N2 問題3 q11",
+      "createdAt": 1794839160589
+    },
+    {
+      "id": "jlpt18-n2-017",
+      "level": "N2",
+      "type": "PARAPHRASE",
+      "prompt": "今年の夏は暑さが厳しく、仕事から家に帰ると疲れて（　　）してしまう。",
+      "choices": [
+        "ぐったり",
+        "しっかり",
+        "すっきり",
+        "ぎっしり"
+      ],
+      "answer": 0,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N2 問題4 q17",
+      "createdAt": 1794839160589
+    },
+    {
+      "id": "jlpt18-n2-022",
+      "level": "N2",
+      "type": "PARAPHRASE",
+      "prompt": "列に並んでいたら、私の前に強引に（　　）きた人がいて、嫌な気分になった。",
+      "choices": [
+        "当てはまって",
+        "付け加えて",
+        "行き着いて",
+        "割り込んで"
+      ],
+      "answer": 3,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N2 問題4 q22",
+      "createdAt": 1794839160589
+    },
+    {
+      "id": "jlpt18-n2-028",
+      "level": "N2",
+      "type": "USAGE",
+      "prompt": "次の言葉の使い方として最もよいものを、１・２・３・４から一つ選びなさい。\n延長",
+      "choices": [
+        "悪天候で列車が運転をやめたため、旅行の出発が三日後に延長された。",
+        "初めの設計では２階建てだったが、３階建ての家に延長することにした。",
+        "予定の時間内に結論が出ず、会議が１時間延長されることになった。",
+        "電車の中で居眠りをして、降りる駅を一駅延長してしまった。"
+      ],
+      "answer": 2,
+      "explanation": "",
+      "source": "JLPT官方問題例2018 N2 問題6 q28",
+      "createdAt": 1794839160589
+    }
+  ]
+}

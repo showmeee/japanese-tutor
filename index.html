@@ -985,6 +985,7 @@ function init() {
     setTimeout(() => openSettings(), 300);
   }
   renderHistory();
+  bankLoadBuiltin().catch(e => console.warn('builtin bank load failed:', e));
 }
 
 function initReviewCards() {
@@ -2279,6 +2280,26 @@ const bankPut = q => bankTx('readwrite', s => s.put(q));
 const bankDelete = id => bankTx('readwrite', s => s.delete(id));
 const bankCount = () => bankTx('readonly', s => s.count());
 function bankInvalidate() { bankIndex = null; }
+
+// 内置题库随应用分发；每个 id 只自动导入一次，用户删掉的内置题不会复活
+async function bankLoadBuiltin() {
+  let done = [];
+  try { done = JSON.parse(localStorage.getItem('goshi_builtin_bank_done') || '[]'); } catch (e) {}
+  const res = await fetch('./bank-builtin.json');
+  if (!res.ok) return;
+  const data = await res.json();
+  const qs = (Array.isArray(data) ? data : (data.questions || [])).filter(q => q && q.id);
+  const doneSet = new Set(done);
+  const existing = new Set((await bankAll()).map(q => q.id));
+  let added = 0;
+  for (const q of qs) {
+    if (doneSet.has(q.id) || existing.has(q.id) || bankValidate(q)) continue;
+    await bankPut(q);
+    added++;
+  }
+  if (added) { bankInvalidate(); showToast('已自动导入 ' + added + ' 道内置真题'); }
+  localStorage.setItem('goshi_builtin_bank_done', JSON.stringify([...new Set([...done, ...qs.map(q => q.id)])]));
+}
 
 function bankValidate(q) {
   if (!q.prompt || !q.prompt.trim()) return '题干不能为空';
