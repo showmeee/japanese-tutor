@@ -1,0 +1,8 @@
+# 秘密与本地凭据：绝不进公开仓库
+.env
+codes.csv
+codes.json
+*.local
+
+# 依赖
+node_modules/

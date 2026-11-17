@@ -11,6 +11,7 @@
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-title" content="語師">
 <script src="./vendor/marked.min.js"></script>
+<script src="./vendor/purify.min.js"></script>
 <style>
 :root {
   --bg: #F2F2F7; --card: #FFFFFF; --primary: #007AFF; --primary-light: rgba(0,122,255,0.08);
@@ -398,6 +399,15 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
   <div class="modal" style="position:relative;">
     <button class="modal-close" id="closeSettings">✕</button>
     <h3>设置</h3>
+    <div class="setting-group">
+      <div class="setting-label">内测模式（邀请码，无需自填 Key）</div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text2);">
+        <input type="checkbox" id="settingBeta"> 启用内测模式（走老师代理）
+      </label>
+      <input class="setting-input" id="settingBetaCode" placeholder="邀请码（老师发放）" autocomplete="off" style="margin-top:8px;">
+      <input class="setting-input" id="settingBetaProxy" type="url" placeholder="代理地址（老师提供，如 https://xxx.workers.dev）" style="margin-top:8px;">
+      <div class="setting-hint">内测模式用邀请码调用老师的限流代理，不需要自己的 Key；下方 Key / API 地址为自带 Key（BYOK）高级选项。</div>
+    </div>
     <div class="setting-group">
       <div class="setting-label">DeepSeek API Key</div>
       <input class="setting-input" id="settingKey" type="password" placeholder="sk-..." autocomplete="off">
@@ -947,6 +957,9 @@ let state = {
   currentId: null,
   apiKey: '',
   apiBase: 'https://api.deepseek.com',
+  betaMode: false,   // 内测模式：邀请码走老师代理，无需自填 Key
+  betaCode: '',
+  betaProxy: '',
   model: 'deepseek-flash',
   generating: false,
   abortController: null,
@@ -1003,11 +1016,31 @@ function init() {
   setupPWA();
   updateInputPlaceholder();
   updateReviewBadge();
-  if (!state.apiKey) {
+  if (!state.apiKey && !betaActive()) {
     setTimeout(() => openSettings(), 300);
   }
   renderHistory();
   bankLoadBuiltin().catch(e => console.warn('builtin bank load failed:', e));
+  applyAskParam();
+  deviceUUID();
+}
+
+// 题库分享页 bank.html 的「问 AI 讲解」跳转：?ask=<id> 只预填题目，不自动发请求
+async function applyAskParam() {
+  const id = new URLSearchParams(location.search).get('ask');
+  if (!id) return;
+  try {
+    const res = await fetch('./bank-builtin.json');
+    if (!res.ok) return;
+    const data = await res.json();
+    const q = (Array.isArray(data) ? data : (data.questions || [])).find(x => x && x.id === id);
+    if (!q) return;
+    switchMode('exam');
+    inputText.value = q.prompt + '\n' + q.choices.map((c, i) => (i + 1) + ' ' + c).join('\n');
+    inputText.dispatchEvent(new Event('input', { bubbles: true }));
+    inputText.focus();
+    showToast('已预填真题，点 ↑ 发送让 AI 讲解');
+  } catch (e) { console.warn('ask prefill failed:', e); }
 }
 
 function initReviewCards() {
@@ -1035,6 +1068,9 @@ function loadState() {
   }
   syncModelPicker(state.model || 'deepseek-flash');
   $('#settingApi').value = state.apiBase || 'https://api.deepseek.com';
+  $('#settingBeta').checked = !!state.betaMode;
+  $('#settingBetaCode').value = state.betaCode || '';
+  $('#settingBetaProxy').value = state.betaProxy || '';
   if (!state.reasoningEffort) state.reasoningEffort = 'none';
   $('#settingEffort').value = state.reasoningEffort;
   if (state.furigana === undefined) state.furigana = true;
@@ -1479,6 +1515,7 @@ function renderReviewDone() {
   state.reviewSession = null;
   saveState();
   updateReviewBadge();
+  sendBetaEvent('review_done');
 }
 
 function handleReviewAction(action) {
@@ -1559,7 +1596,7 @@ function renderMessage(msg) {
     content += escHtml(msg.content);
     return `<div class="msg user"><div class="msg-avatar">我</div><div class="msg-bubble">${content}</div></div>`;
   } else {
-    const html = (msg.bank ? bankHitHtml(msg.bank) : '') + marked.parse(msg.content || '');
+    const html = (msg.bank ? bankHitHtml(msg.bank) : '') + DOMPurify.sanitize(marked.parse(msg.content || ''));
     const verify = msg.verify ? `<div class="check-result ${msg.verify.kind}">${escHtml(msg.verify.text)}</div>` : '';
     return `<div class="msg assistant" data-raw="${escAttr(msg.content || '')}"><div class="msg-avatar">師</div><div class="msg-bubble">${html}${verify}${msgToolsHtml(msg)}</div></div>`;
   }
@@ -1614,7 +1651,7 @@ function updateAssistantBubble(content) {
   if (!el) return;
   const holder = document.getElementById('msg-pending');
   const notice = holder && holder.dataset.bankHtml;
-  el.innerHTML = marked.parse(content || '');
+  el.innerHTML = DOMPurify.sanitize(marked.parse(content || ''));
   if (notice) el.insertAdjacentHTML('afterbegin', notice);
   applyFurigana(el);
   scrollToBottom();
@@ -1821,11 +1858,38 @@ function injectRelevantKnowledge(userText, convMessages) {
 }
 
 // ─── API Call ─────────────────────────────────────────────────
+// ─── 内测代理（邀请码）─────────────────────────────
+const BETA_PROXY_DEFAULT = ''; // 老师部署 Workers 后可填默认代理地址；留空则需在设置里手动填
+function betaProxyBase() { return (state.betaProxy || BETA_PROXY_DEFAULT).replace(/\/$/, ''); }
+function betaActive() { return !!(state.betaMode && state.betaCode && betaProxyBase()); }
+function apiBaseEffective() { return betaActive() ? betaProxyBase() : state.apiBase; }
+function apiAuthHeaders() { return betaActive() ? { 'X-Invite-Code': state.betaCode } : { 'Authorization': 'Bearer ' + state.apiKey }; }
+function isDeepseekBackend() { return betaActive() || /deepseek\.com/.test(state.apiBase); }
+function deviceUUID() {
+  let u = localStorage.getItem('goshi_device_uuid');
+  if (!u) {
+    u = (crypto.randomUUID ? crypto.randomUUID() : 'd-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
+    localStorage.setItem('goshi_device_uuid', u);
+  }
+  return u;
+}
+function sendBetaEvent(name) {
+  if (!betaActive()) return;
+  try {
+    fetch(betaProxyBase() + '/event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Invite-Code': state.betaCode },
+      body: JSON.stringify({ code: state.betaCode, event: name, device: deviceUUID() }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch (e) {}
+}
+
 async function sendMessage(opts = {}) {
   const text = inputText.value.trim();
   const imageData = state.pendingImage;
   if (!text && !imageData) return;
-  if (!state.apiKey) { openSettings(); showToast('请先设置 API Key'); return; }
+  if (!state.apiKey && !betaActive()) { openSettings(); showToast('请先设置 API Key 或开启内测模式'); return; }
 
   inputText.value = '';
   inputText.style.height = 'auto';
@@ -1899,7 +1963,7 @@ async function sendMessage(opts = {}) {
   const hasImage = apiMessages.some(m => Array.isArray(m.content));
   const solveModel = (state.mode === 'exam' && !hasImage) ? examSolveModel() : state.model;
   const reqBody = { model: solveModel, messages: apiMessages, stream: true, temperature: state.mode === 'exam' ? 0.2 : 0.7, max_tokens: 4096 };
-  if (/deepseek\.com/.test(state.apiBase)) {
+  if (isDeepseekBackend()) {
     if (state.reasoningEffort === 'none') {
       reqBody.thinking = { type: 'disabled' };
     } else {
@@ -1911,9 +1975,9 @@ async function sendMessage(opts = {}) {
   let fullContent = '';
   try {
     state.abortController = new AbortController();
-    const resp = await fetch(state.apiBase + '/v1/chat/completions', {
+    const resp = await fetch(apiBaseEffective() + '/v1/chat/completions', {
       method:'POST',
-      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + state.apiKey },
+      headers:{ 'Content-Type':'application/json', ...apiAuthHeaders() },
       body: JSON.stringify(reqBody),
       signal: state.abortController.signal,
     });
@@ -2138,9 +2202,9 @@ function confirmCrop(whole) {
   imagePreview.classList.add('show');
   btnSend.disabled = false;
   if (state.mode !== 'exam') switchMode('exam');
-  if (!state.apiKey) {
+  if (!state.apiKey && !betaActive()) {
     openSettings();
-    showToast('请先设置 API Key');
+    showToast('请先设置 API Key 或开启内测模式');
     return;
   }
   startOcr(dataUrl);
@@ -2186,7 +2250,7 @@ async function chatOnce(messages, opts = {}) {
     temperature: opts.temperature ?? 0.2,
     max_tokens: opts.maxTokens || 1200,
   };
-  if (/deepseek\.com/.test(state.apiBase)) {
+  if (isDeepseekBackend()) {
     if (opts.thinking === false || state.reasoningEffort === 'none') {
       reqBody.thinking = { type: 'disabled' };
     } else {
@@ -2194,9 +2258,9 @@ async function chatOnce(messages, opts = {}) {
       reqBody.reasoning_effort = state.reasoningEffort;
     }
   }
-  const resp = await fetch(state.apiBase + '/v1/chat/completions', {
+  const resp = await fetch(apiBaseEffective() + '/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Content-Type':'application/json', 'Authorization': 'Bearer ' + state.apiKey },
+    headers: { 'Content-Type':'application/json', ...apiAuthHeaders() },
     body: JSON.stringify(reqBody),
   });
   if (!resp.ok) {
@@ -2774,6 +2838,9 @@ function saveSettings() {
     syncModelPicker(state.model);
   }
   state.apiBase = $('#settingApi').value.trim().replace(/\/$/, '');
+  state.betaMode = $('#settingBeta').checked;
+  state.betaCode = $('#settingBetaCode').value.trim();
+  state.betaProxy = $('#settingBetaProxy').value.trim().replace(/\/$/, '');
   state.reasoningEffort = $('#settingEffort').value;
   const saved = saveState();
   settingsModal.classList.remove('show');
@@ -2787,13 +2854,20 @@ function saveSettings() {
 async function testApiConnection() {
   const resultEl = $('#testResult');
   const btn = $('#testConnection');
+  resultEl.style.whiteSpace = 'pre-line';
   const apiKey = $('#settingKey').value.trim();
   const apiBase = $('#settingApi').value.trim().replace(/\/$/, '');
+  const betaOn = $('#settingBeta').checked;
+  const betaCode = $('#settingBetaCode').value.trim();
+  const betaProxy = $('#settingBetaProxy').value.trim().replace(/\/$/, '');
+  const useBeta = !!(betaOn && betaCode && betaProxy);
+  const base = useBeta ? betaProxy : apiBase;
+  const hdrs = useBeta ? { 'X-Invite-Code': betaCode } : { 'Authorization': 'Bearer ' + apiKey };
 
-  if (!apiKey) {
+  if (!useBeta && !apiKey) {
     resultEl.style.display = 'block';
     resultEl.style.color = 'var(--red)';
-    resultEl.innerHTML = '❌ 请先输入 API Key';
+    resultEl.textContent = '❌ 请先输入 API Key，或开启内测模式并填写邀请码/代理地址';
     return;
   }
 
@@ -2801,26 +2875,26 @@ async function testApiConnection() {
   btn.textContent = '⏳ 测试中...';
   resultEl.style.display = 'block';
   resultEl.style.color = 'var(--text2)';
-  resultEl.innerHTML = '正在连接 ' + apiBase + ' ...';
+  resultEl.textContent = '正在连接 ' + base + ' ...';
 
   try {
-    const resp = await fetch(apiBase + '/v1/models', {
+    const resp = await fetch(base + '/v1/models', {
       method: 'GET',
-      headers: { 'Authorization': 'Bearer ' + apiKey }
+      headers: hdrs
     });
 
     if (resp.ok) {
       const data = await resp.json();
       resultEl.style.color = 'var(--green)';
-      resultEl.innerHTML = '✅ 连接成功！<br>可用模型: ' + (data.data?.length || 0) + ' 个';
+      resultEl.textContent = '✅ 连接成功！\n可用模型: ' + (data.data?.length || 0) + ' 个';
     } else {
       const err = await resp.text();
       resultEl.style.color = 'var(--red)';
-      resultEl.innerHTML = '❌ API 返回错误 ' + resp.status + '<br>' + err.slice(0, 100);
+      resultEl.textContent = '❌ API 返回错误 ' + resp.status + '\n' + err.slice(0, 100);
     }
   } catch (e) {
     resultEl.style.color = 'var(--red)';
-    resultEl.innerHTML = '❌ 网络错误<br>' + e.message + '<br><small style="color:var(--text3)">可能原因：无网络/需代理/DNS问题</small>';
+    resultEl.textContent = '❌ 网络错误\n' + e.message + '\n可能原因：无网络/需代理/DNS问题';
   } finally {
     btn.disabled = false;
     btn.textContent = '🔌 测试连接';
