@@ -53,7 +53,15 @@ python3 -m http.server 8765
 - `bash scripts/gen-codes.sh N` 一键生成邀请码并上传 KV（`codes.csv` 本地填昵称，均不进 git）；
   `bash scripts/gen-codes.sh 1 teacher` 生成教师码（不限次，只给老师）；
   吊销 `bash scripts/revoke-code.sh <码>`，用量 `bash scripts/stats.sh`。详见 [`邀测码管理.md`](邀测码管理.md)。
-- 前端设置 → 内测模式：填邀请码 + 代理地址；保留自带 Key（BYOK）高级选项。
+- 前端进入即核验邀请码（不填不能用）；学生设置极简，教师模式连点设置标题 5 下或 `?teacher=1`。
+
+## 开源增量题库（本地私有，不进仓库）
+
+`bash scripts/build-bank-extra.sh` 从三个开源仓库下载并转换增量练习题，生成
+`bank-extra-oj.json` / `bank-extra-aic.json` / `bank-extra-js.json`（均已 gitignore）。
+在 app 🗂️题库 → 📄导入 JSON/文本文件 逐个导入；新 id 前缀 `oj-/aic-/js-`，
+与内置 494 题永不冲突，重复导入自动跳过。许可证与注意事项见本地「题库增量说明.txt」。
+其中 Open-JLPT 无许可证，**仅限个人学习导入，不得再分发**；公开内置题库仍只含官方免费样题。
 
 ## 隐私与安全
 

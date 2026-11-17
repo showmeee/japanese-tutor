@@ -5,6 +5,10 @@ codes.json
 *.local
 宣传手册.txt
 
+# 开源题库增量包：含无许可证内容（Open-JLPT），仅限本地私有导入，不进公开仓库
+bank-extra*.json
+题库增量说明.txt
+
 # 依赖
 node_modules/
 
