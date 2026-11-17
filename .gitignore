@@ -3,6 +3,7 @@
 codes.csv
 codes.json
 *.local
+宣传手册.txt
 
 # 依赖
 node_modules/

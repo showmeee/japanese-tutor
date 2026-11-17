@@ -57,7 +57,8 @@ Key 只存在服务端 secret，按码每日限 20 次，不记录聊天内容�
 | GET | `/stats` | `X-Admin-Code` | 最近 14 天按天聚合：请求数/活跃码/每码分布/事件数 |
 
 限次：key = `rl:<码>:<YYYY-MM-DD>`，TTL 48h，每码每天 20 次，第 21 次返回 429。
-错码 / 缺码返回 403。`/stats` 无口令或错口令返回 403。
+**教师码不限次**：KV value 带 `"teacher": true` 的码跳过限次（仍计统计），用 `bash scripts/gen-codes.sh 1 teacher` 生成。
+`/v1/models` 只验码不计次。错码 / 缺码返回 403。`/stats` 无口令或错口令返回 403。
 
 ## 查看回访表
 

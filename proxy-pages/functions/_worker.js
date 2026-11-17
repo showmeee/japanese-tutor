@@ -23,9 +23,11 @@ function json(obj, status, headers) {
 function dayKey(offset = 0) {
   return new Date(Date.now() - offset * 86400000).toISOString().slice(0, 10);
 }
-async function inviteValid(env, code) {
-  if (!code) return false;
-  return (await env.INVITES.get(code)) !== null;
+async function inviteMeta(env, code) {
+  if (!code) return null;
+  const raw = await env.INVITES.get(code);
+  if (raw === null) return null;
+  try { return JSON.parse(raw) || {}; } catch (e) { return {}; }
 }
 async function bumpRate(env, code) {
   const k = 'rl:' + code + ':' + dayKey();
@@ -71,7 +73,7 @@ export default {
 
     if (path === '/event' && request.method === 'POST') {
       const code = request.headers.get('X-Invite-Code') || '';
-      if (!(await inviteValid(env, code))) return json({ error: 'invalid invite' }, 403, cors);
+      if (!(await inviteMeta(env, code))) return json({ error: 'invalid invite' }, 403, cors);
       let body = {};
       try { body = await request.json(); } catch (e) {}
       const name = String(body.event || '').slice(0, 40);
@@ -83,11 +85,15 @@ export default {
     const isModels = path === '/v1/models' && request.method === 'GET';
     if (isChat || isModels) {
       const code = request.headers.get('X-Invite-Code') || '';
-      if (!(await inviteValid(env, code))) return json({ error: 'invalid invite' }, 403, cors);
+      const meta = await inviteMeta(env, code);
+      if (!meta) return json({ error: 'invalid invite' }, 403, cors);
       // /v1/models 仅作邀请码核验，不消耗每日次数；只有真实问答计次
+      // 教师码（KV value 带 teacher:true）不限次，但仍计入统计
       if (isChat) {
-        const n = await bumpRate(env, code);
-        if (n > DAY_LIMIT) return json({ error: 'daily limit exceeded' }, 429, cors);
+        if (!meta.teacher) {
+          const n = await bumpRate(env, code);
+          if (n > DAY_LIMIT) return json({ error: 'daily limit exceeded' }, 429, cors);
+        }
         await bumpStats(env, code, 'req');
       }
       const upstream = await fetch(DEEPSEEK_BASE + path, {

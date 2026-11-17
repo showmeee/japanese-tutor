@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 // 生成 N 个 8 位邀请码。
-//   node scripts/gen-codes.js [N=10]
+//   node scripts/gen-codes.js [N=10]          普通码（每码每天 20 次）
+//   node scripts/gen-codes.js [N=1] teacher   教师码（不限次，只给老师自己）
 // 输出：codes.json（wrangler kv bulk put 上传 KV 的格式）+ codes.csv（码+备注列，本地填昵称，不进 git）。
 // 重复运行会保留旧码、只追加新码。
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const N = parseInt(process.argv[2] || '10', 10);
+const TEACHER = process.argv[3] === 'teacher';
 const root = path.join(__dirname, '..');
 const ALPH = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 去掉易混的 I/O/0/1
 
@@ -19,7 +21,9 @@ while (added.length < N) {
   for (let i = 0; i < 8; i++) c += ALPH[crypto.randomInt(ALPH.length)];
   if (seen.has(c)) continue;
   seen.add(c);
-  added.push({ key: c, value: JSON.stringify({ note: '', createdAt: new Date().toISOString() }) });
+  const meta = { note: TEACHER ? '老师自用（不限次）' : '', createdAt: new Date().toISOString() };
+  if (TEACHER) meta.teacher = true;
+  added.push({ key: c, value: JSON.stringify(meta) });
 }
 const merged = old.concat(added);
 fs.writeFileSync(path.join(root, 'codes.json'), JSON.stringify(merged, null, 1));
@@ -38,5 +42,6 @@ const csv = ['code,note'].concat(merged.map(e => {
 })).join('\n') + '\n';
 fs.writeFileSync(path.join(root, 'codes.csv'), csv);
 console.log('新增', added.length, '个邀请码，累计', merged.length);
+if (TEACHER) console.log('⚠️ 本次生成的是教师码（不限次）：只留给自己，切勿发给学生；泄露立即吊销');
 console.log('codes.json → 上传 KV：wrangler kv bulk put codes.json --binding=INVITES（见 proxy/README.md）');
 console.log('codes.csv → 本地填昵称备注，不进 git');

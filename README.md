@@ -51,6 +51,7 @@ python3 -m http.server 8765
 
 - 主部署走 **Cloudflare Pages Functions**（`proxy-pages/`，国内可达 `*.pages.dev`）；`*.workers.dev` 国内被墙，Worker 版仅作海外备份。服务端代持 `DEEPSEEK_KEY`（secret），学生填邀请码走代理，每码每天 20 次。
 - `bash scripts/gen-codes.sh N` 一键生成邀请码并上传 KV（`codes.csv` 本地填昵称，均不进 git）；
+  `bash scripts/gen-codes.sh 1 teacher` 生成教师码（不限次，只给老师）；
   吊销 `bash scripts/revoke-code.sh <码>`，用量 `bash scripts/stats.sh`。详见 [`邀测码管理.md`](邀测码管理.md)。
 - 前端设置 → 内测模式：填邀请码 + 代理地址；保留自带 Key（BYOK）高级选项。
 
