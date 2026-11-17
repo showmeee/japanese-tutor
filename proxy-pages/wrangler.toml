@@ -1,0 +1,15 @@
+name = "goshi-api"
+pages_build_output_dir = "./public"
+compatibility_date = "2026-11-01"
+
+# 与 Worker 共用同一个 KV（邀请码/限次/日聚合）
+kv_namespaces = [
+  { binding = "INVITES", id = "e2165d8f00124786bc517699c175906b" }
+]
+
+[vars]
+ALLOWED_ORIGIN = "http://localhost:8765,http://localhost:8766"
+
+# secret 用命令设置（不进 git）：
+#   wrangler pages secret put DEEPSEEK_KEY --project-name goshi-api
+#   wrangler pages secret put ADMIN_CODE --project-name goshi-api

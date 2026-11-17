@@ -5,12 +5,12 @@ compatibility_date = "2026-11-01"
 # KV：邀请码 + 限次 + 日聚合 都存这一个 namespace（binding 名必须为 INVITES）
 # 先 `wrangler kv namespace create INVITES`，把返回的 id 填到下面
 kv_namespaces = [
-  { binding = "INVITES", id = "<替换为你的 KV namespace id>" }
+  { binding = "INVITES", id = "e2165d8f00124786bc517699c175906b" }
 ]
 
 # CORS 只允许你的 Pages 域名（多个用逗号分隔）；本地调试可临时加 http://localhost:8765
 [vars]
-ALLOWED_ORIGIN = "https://<你的 Pages 域名>"
+ALLOWED_ORIGIN = "http://localhost:8765,http://localhost:8766"
 
 # 两个 secret 不要写在这里，用命令设置（见 README）：
 #   wrangler secret put DEEPSEEK_KEY

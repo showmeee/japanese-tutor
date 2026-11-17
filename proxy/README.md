@@ -1,9 +1,17 @@
-# 語師 内测代理（Cloudflare Workers）
+# 語師 内测代理（Cloudflare Pages Functions / Workers）
 
 给学生发「邀请码 + 代理地址」，学生无需自己的 DeepSeek Key：前端填邀请码走本代理，
-Key 只存在 Worker 的服务端 secret，按码每日限 20 次，不记录聊天内容与 IP。
+Key 只存在服务端 secret，按码每日限 20 次，不记录聊天内容与 IP。
 
-## 部署步骤
+## 国内可达性（重要）
+
+- **`*.workers.dev` 在国内被 DNS+SNI 封锁，打不开**；`*.pages.dev` 实测国内可达。
+- 因此**主部署走 Pages Functions**（`proxy-pages/`，catch-all 路由复用同一份核心逻辑
+  `proxy-pages/functions/_worker.js`），地址形如 `https://goshi-api.pages.dev`。
+- `proxy/worker.js` 现在只是 re-export 同一核心，保留 Worker 部署仅作海外/备份用途。
+- 要更稳更快可后续绑自定义域名（需自有域名；国内最稳再 ICP 备案），非必需。
+
+## 部署步骤（Pages 主线）
 
 1. 安装 wrangler 并登录（需要你自己的 Cloudflare 账号）：
    ```bash
@@ -14,27 +22,30 @@ Key 只存在 Worker 的服务端 secret，按码每日限 20 次，不记录聊
    ```bash
    wrangler kv namespace create INVITES
    ```
-   把返回的 `id` 填进 `wrangler.toml` 的 `kv_namespaces[0].id`。
-3. 设置两个 secret（**不要**写进 toml 或提交）：
+   把返回的 `id` 填进 `proxy-pages/wrangler.toml`（和 `proxy/wrangler.toml`）的 `kv_namespaces[0].id`。
+3. 生成邀请码并上传 KV（**必须加 `--remote`**，否则只写本地模拟）：
    ```bash
-   wrangler secret put DEEPSEEK_KEY   # 你的 DeepSeek key，服务端代持
-   wrangler secret put ADMIN_CODE     # /stats 管理口令，自设一个强口令
-   ```
-4. 配置 CORS：编辑 `wrangler.toml` 的 `[vars] ALLOWED_ORIGIN` 为你的 Pages 域名
-   （如 `https://showmeee.github.io` 或自定义域；多个用逗号分隔）。
-   本地联调可临时追加 `http://localhost:8765`，上线前移除。
-5. 生成邀请码并上传 KV：
-   ```bash
-   node scripts/gen-codes.js 20                 # 生成 20 个 8 位码
-   wrangler kv bulk put codes.json --binding=INVITES
+   node scripts/gen-codes.js 20
+   wrangler kv bulk put codes.json --binding=INVITES --remote
    ```
    `codes.csv` 留在本地填「码 → 学生昵称」备注，**不进 git**。
-6. 部署：
+4. 设置两个 secret（**不要**写进 toml 或提交；Pages 用 `pages secret put`）：
    ```bash
-   wrangler deploy
+   cd proxy-pages
+   wrangler pages secret put DEEPSEEK_KEY --project-name goshi-api   # 你的 key，服务端代持
+   wrangler pages secret put ADMIN_CODE  --project-name goshi-api   # /stats 管理口令
    ```
-   得到 `https://goshi-proxy.<你的子域>.workers.dev`。把它发给学生填到
-   应用设置 → 内测模式 → 代理地址；邀请码一对一发给学生。
+   管道喂值时去掉行尾换行：`printf '%s' "$(cat key文件)" | wrangler pages secret put …`。
+5. 配置 CORS：编辑 `proxy-pages/wrangler.toml` 的 `[vars] ALLOWED_ORIGIN` 为前端实际 origin
+   （多个逗号分隔）。本地联调加 `http://localhost:8765`。
+6. 创建项目并部署：
+   ```bash
+   wrangler pages project create goshi-api --production-branch main
+   wrangler pages deploy public --project-name goshi-api
+   ```
+   得到 `https://goshi-api.pages.dev`。发给学生填到 应用设置 → 内测模式 → 代理地址。
+7. **改 secret / vars / 绑定后必须重新 `pages deploy`**：Pages 在部署时快照配置，
+   事后 `secret put` 不会自动作用于已上线的部署。
 
 ## 接口
 
@@ -51,7 +62,7 @@ Key 只存在 Worker 的服务端 secret，按码每日限 20 次，不记录聊
 ## 查看回访表
 
 ```bash
-node scripts/stats.js https://goshi-proxy.<子域>.workers.dev <ADMIN_CODE>
+node scripts/stats.js https://goshi-api.pages.dev <ADMIN_CODE>
 ```
 
 ## 验收清单
@@ -62,9 +73,13 @@ node scripts/stats.js https://goshi-proxy.<子域>.workers.dev <ADMIN_CODE>
 - 无口令访问 `/stats` 403；
 - 非 `ALLOWED_ORIGIN` 的浏览器跨域请求被 CORS 拦截。
 
+注意：用脚本验收时带浏览器 User-Agent；Cloudflare 边缘会对 python-urllib 等
+非浏览器 UA 返回 `error code: 1010`（bot 拦截），那是边缘行为不是代理逻辑。
+
 ## 安全说明
 
-- `DEEPSEEK_KEY`、`ADMIN_CODE` 仅为 Worker secret；`codes.json`/`codes.csv` 含邀请码，
+- `DEEPSEEK_KEY`、`ADMIN_CODE` 仅为服务端 secret；`codes.json`/`codes.csv`/`*.local` 含邀请码/口令，
   已加入 `.gitignore`，绝不进公开仓库。
-- Worker 不 `console.log` 请求体、不记录 IP；KV 只存计数与聚合，不存聊天内容。
-- 邀请码泄露即可刷你的额度：发现滥用可在 KV 删除该码（`wrangler kv key delete <码> --binding=INVITES`）。
+- 代理不 `console.log` 请求体、不记录 IP；KV 只存计数与聚合，不存聊天内容。
+- 邀请码泄露即可刷你的额度：发现滥用可在 KV 删除该码
+  （`wrangler kv key delete <码> --binding=INVITES --remote`）。

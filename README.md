@@ -46,7 +46,7 @@ python3 -m http.server 8765
 
 见 [`proxy/README.md`](proxy/README.md)。要点：
 
-- Cloudflare Workers 代持 `DEEPSEEK_KEY`（secret），学生填邀请码走代理，每码每天 20 次。
+- 主部署走 **Cloudflare Pages Functions**（`proxy-pages/`，国内可达 `*.pages.dev`）；`*.workers.dev` 国内被墙，Worker 版仅作海外备份。服务端代持 `DEEPSEEK_KEY`（secret），学生填邀请码走代理，每码每天 20 次。
 - `node scripts/gen-codes.js N` 生成邀请码 → `codes.json` 上传 KV、`codes.csv` 本地填昵称（均不进 git）。
 - `node scripts/stats.js <PROXY_URL> <ADMIN_CODE>` 打印最近 14 天回访表。
 - 前端设置 → 内测模式：填邀请码 + 代理地址；保留自带 Key（BYOK）高级选项。
