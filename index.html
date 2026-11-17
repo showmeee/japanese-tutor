@@ -292,6 +292,7 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
 .bank-item .bi-stem { color: var(--text); line-height: 1.5; word-break: break-all; }
 .bank-item .bi-meta { color: var(--text3); font-size: 12px; margin-top: 2px; word-break: break-all; }
 .bank-item-del { border: none; background: var(--fill); color: var(--text3); border-radius: 50%; width: 24px; height: 24px; flex: none; cursor: pointer; }
+.bank-paper-head { font-size: 13px; font-weight: 600; color: var(--text2); margin: 10px 0 4px; padding: 4px 2px; border-bottom: 1px solid var(--sep); }
 .bank-import-result { display: none; font-size: 13px; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--fill); color: var(--text2); line-height: 1.6; }
 .bank-import-result.show { display: block; }
 .bs-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -491,7 +492,7 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
       <div class="setting-label">导入</div>
       <button class="setting-btn secondary" id="bankImportFile" style="margin-top:0;">📄 导入 JSON / 文本文件</button>
       <input type="file" id="bankFile" accept=".json,.txt,application/json,text/plain" class="hidden">
-      <textarea class="setting-input" id="bankPaste" rows="6" style="margin-top:8px;line-height:1.6;" placeholder="或粘贴内容（文本格式）：&#10;题：彼は社長に就任する（　　）、改革に着手した。&#10;1 や否や&#10;2 ものの&#10;3 ことなく&#10;4 ながらも&#10;答案：1&#10;解析：…&#10;来源：书名 p页 题号&#10;（多题用 --- 分隔；也支持 Open-JLPT 格式 JSON）"></textarea>
+      <textarea class="setting-input" id="bankPaste" rows="6" style="margin-top:8px;line-height:1.6;" placeholder="或粘贴内容（文本格式）：&#10;题：彼は社長に就任する（　　）、改革に着手した。&#10;1 や否や&#10;2 ものの&#10;3 ことなく&#10;4 ながらも&#10;答案：1&#10;解析：…&#10;来源：书名 p页 题号&#10;套卷：2018年12月 N1（可选，同套题同名）&#10;（多题用 --- 分隔；也支持 Open-JLPT 格式 JSON）"></textarea>
       <button class="setting-btn primary" id="bankImportPaste">导入粘贴内容</button>
       <div class="bank-import-result" id="bankImportResult"></div>
       <div class="setting-hint">导入即校验：选项 3–4 个、答案在范围内、id 唯一且不复用。题库只存本机浏览器，不上传、不进 git。</div>
@@ -543,6 +544,10 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
     <div class="setting-group">
       <div class="setting-label">解析（可留空，命中后由模型生成）</div>
       <textarea class="setting-input" id="bsExpl" rows="4" style="line-height:1.6;"></textarea>
+    </div>
+    <div class="setting-group">
+      <div class="setting-label">套卷（同一套题填同一个名字，便于按套管理）</div>
+      <input class="setting-input" id="bsPaper" placeholder="如：2018年12月 N1 · 公式問題集2（可留空）">
     </div>
     <div class="setting-group">
       <div class="setting-label">来源（书名 · 页 · 题号）</div>
@@ -2380,14 +2385,26 @@ async function bankLoadBuiltin() {
   const data = await res.json();
   const qs = (Array.isArray(data) ? data : (data.questions || [])).filter(q => q && q.id);
   const doneSet = new Set(done);
-  const existing = new Set((await bankAll()).map(q => q.id));
-  let added = 0;
+  const existing = new Map((await bankAll()).map(q => [q.id, q]));
+  let added = 0, upgraded = 0;
   for (const q of qs) {
-    if (doneSet.has(q.id) || existing.has(q.id) || bankValidate(q)) continue;
+    const old = existing.get(q.id);
+    if (old) {
+      // 老版本导入的内置题补齐套卷信息、修复历史脏字段（只补空/坏字段，不覆盖老师改过的内容）
+      if (doneSet.has(q.id)) {
+        const patch = {};
+        if (q.paper && !old.paper) patch.paper = q.paper;
+        if (Array.isArray(old.type)) patch.type = String(q.type || '');
+        if (Object.keys(patch).length) { await bankPut(Object.assign({}, old, patch)); upgraded++; }
+      }
+      continue;
+    }
+    if (doneSet.has(q.id) || bankValidate(q)) continue;
     await bankPut(q);
     added++;
   }
-  if (added) { bankInvalidate(); showToast('已自动导入 ' + added + ' 道内置真题'); }
+  if (added || upgraded) bankInvalidate();
+  if (added) showToast('已自动导入 ' + added + ' 道内置真题');
   localStorage.setItem('goshi_builtin_bank_done', JSON.stringify([...new Set([...done, ...qs.map(q => q.id)])]));
 }
 
@@ -2417,7 +2434,7 @@ function bankAnswerIndex(raw, n) {
 function bankParseText(txt) {
   const out = [];
   for (const block of txt.split(/\n\s*(?:---+|===+)\s*\n/)) {
-    const q = { choices: [], explanation: '', source: '', level: '', type: '' };
+    const q = { choices: [], explanation: '', source: '', level: '', type: '', paper: '' };
     let cont = null;
     for (const ln of block.split(/\r?\n/)) {
       const t = ln.trim();
@@ -2427,6 +2444,7 @@ function bankParseText(txt) {
       if ((m = t.match(/^(?:答案|答|正解)[：:]\s*(.+)$/))) { cont = null; q.answerRaw = m[1]; continue; }
       if ((m = t.match(/^(?:解析|解释|说明)[：:]\s*(.*)$/))) { cont = 'explanation'; q.explanation = m[1]; continue; }
       if ((m = t.match(/^(?:来源|出处)[：:]\s*(.*)$/))) { cont = null; q.source = m[1]; continue; }
+      if ((m = t.match(/^(?:套卷|试卷|套题|paper)[：:]\s*(.*)$/i))) { cont = null; q.paper = m[1]; continue; }
       if ((m = t.match(/^(?:级别|等级)[：:]\s*(N[1-5])/i))) { cont = null; q.level = m[1].toUpperCase(); continue; }
       if ((m = t.match(/^题型[：:]\s*(.*)$/))) { cont = null; q.type = m[1]; continue; }
       if ((m = t.match(/^([1-4１-４]|[A-Da-d])[．.、)）:：\s]\s*(.+)$/))) { cont = null; q.choices.push(m[2].trim()); continue; }
@@ -2442,6 +2460,7 @@ async function bankImport(rawText) {
   const t = (rawText || '').trim();
   if (!t) { showToast('没有可导入的内容'); return result; }
   let items;
+  let paperDefault = '';
   if (t.startsWith('{') || t.startsWith('[')) {
     let j;
     try { j = JSON.parse(t); } catch (e) {
@@ -2450,6 +2469,7 @@ async function bankImport(rawText) {
     }
     const passages = {};
     for (const p of (j.passages || [])) passages[p.id] = p.text || '';
+    paperDefault = String((j && j.paper) || '').trim();
     items = (Array.isArray(j) ? j : (j.questions || [])).map(q => Object.assign({}, q, {
       prompt: ((q.passageId && passages[q.passageId]) ? passages[q.passageId] + '\n' : '') + (q.prompt || ''),
     }));
@@ -2471,6 +2491,7 @@ async function bankImport(rawText) {
       answer: typeof src.answer === 'number' ? src.answer : bankAnswerIndex(src.answerRaw ?? src.answer, choices.length),
       explanation: String(src.explanation || '').trim(),
       source: String(src.source || '').trim(),
+      paper: String(src.paper || paperDefault || '').trim(),
       createdAt: Date.now(),
     };
     const label = q.id || ('第' + (i + 1) + '题');
@@ -2538,7 +2559,7 @@ async function ensureBankIndex() {
   const all = await bankAll();
   bankIndex = all.map(q => ({
     id: q.id, norm: bankNorm(q.prompt), answer: q.answer,
-    level: q.level || '', source: q.source || '',
+    level: q.level || '', source: q.source || '', paper: q.paper || '',
     choiceTexts: q.choices || [], choices: (q.choices || []).map(bankNorm),
   }));
   return bankIndex;
@@ -2570,8 +2591,9 @@ async function bankMatch(text) {
 function bankHitHtml(b) {
   const n = (b.answer ?? 0) + 1;
   const ct = b.choiceTexts && b.choiceTexts[b.answer] ? `（${escHtml(b.choiceTexts[b.answer])}）` : '';
+  const paper = b.paper ? ` · 📦 ${escHtml(b.paper)}` : '';
   const src = b.source ? ` · 来源：${escHtml(b.source)}` : '';
-  return `<div class="bank-hit" data-bank-id="${escAttr(b.id || '')}">📚 真题库命中 · 标准答案 ${n}${ct}${src} · 答案以库为准，解析由模型生成</div>`;
+  return `<div class="bank-hit" data-bank-id="${escAttr(b.id || '')}">📚 真题库命中 · 标准答案 ${n}${ct}${paper}${src} · 答案以库为准，解析由模型生成</div>`;
 }
 function bankAuthorityPrompt(b) {
   const n = b.answer + 1;
@@ -2588,15 +2610,26 @@ async function openBank() {
 async function renderBank() {
   const all = await bankAll();
   renderBankReports();
-  $('#bankCount').textContent = `共 ${all.length} 题 · 仅存本机浏览器，不上传、不进 git`;
-  $('#bankList').innerHTML = all.length ? all.map(q => `
+  const groups = new Map();
+  for (const q of all) {
+    const p = q.paper || '';
+    if (!groups.has(p)) groups.set(p, []);
+    groups.get(p).push(q);
+  }
+  const keys = [...groups.keys()].sort((a, b) => (a ? 0 : 1) - (b ? 0 : 1) || a.localeCompare(b, 'ja'));
+  const paperCount = keys.filter(Boolean).length;
+  $('#bankCount').textContent = `共 ${all.length} 题 · ${paperCount} 套卷 · 仅存本机浏览器，不上传`;
+  const itemHtml = q => `
     <div class="bank-item">
       <div class="bi-main">
         <div class="bi-stem">${escHtml((q.prompt || '').slice(0, 60))}${(q.prompt || '').length > 60 ? '…' : ''}</div>
         <div class="bi-meta">${escHtml(q.level || '')} ${escHtml(q.type || '')} · 答案 ${(q.answer ?? 0) + 1} · ${escHtml(q.source || '无来源')} · ${escHtml(q.id)}</div>
       </div>
       <button class="bank-item-del" data-bank-del="${escAttr(q.id)}">✕</button>
-    </div>`).join('')
+    </div>`;
+  $('#bankList').innerHTML = all.length ? keys.map(p =>
+    `<div class="bank-paper-head">${p ? '📦 ' + escHtml(p) : '未分组'} · ${groups.get(p).length} 题</div>` + groups.get(p).map(itemHtml).join('')
+  ).join('')
     : '<div class="setting-hint">还没有题。导入 JSON/文本，或在真题解析后点「💾 存题」。</div>';
 }
 async function bankExport() {
@@ -2627,6 +2660,7 @@ function openBankSave(btn) {
   for (let i = 1; i <= 4; i++) $('#bsC' + i).value = choices[i - 1] || '';
   $('#bsAnswer').value = ans && /^[1-4]$/.test(ans) ? ans : '';
   $('#bsExpl').value = raw.replace(/\n?最終答案[：:].*$/, '').trim().slice(0, 2000);
+  $('#bsPaper').value = '';
   $('#bsSource').value = '';
   $('#bsHint').textContent = ans ? '答案预填自模型解析，请务必核对后再存入。' : '模型未给确定答案：请老师手动选择正确答案后存入。';
   $('#bankSaveModal').classList.add('show');
@@ -2642,6 +2676,7 @@ async function confirmBankSave() {
     answer: $('#bsAnswer').value ? parseInt($('#bsAnswer').value, 10) - 1 : -1,
     explanation: $('#bsExpl').value.trim(),
     source: $('#bsSource').value.trim(),
+    paper: $('#bsPaper').value.trim(),
     createdAt: Date.now(),
   };
   const err = bankValidate(q);
@@ -2853,7 +2888,7 @@ function renderHistory() {
 }
 
 // ─── Utilities ────────────────────────────────────────────────
-function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escHtml(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function escAttr(s) { return escHtml(s).replace(/"/g,'&quot;'); }
 
 function formatTime(ts) {
