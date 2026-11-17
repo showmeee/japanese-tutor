@@ -2,7 +2,10 @@
 
 面向日语课堂的单文件 PWA：JLPT 语法知识库、DeepSeek 流式问答与真题解析、拍照 OCR、
 假名注音、日语朗读、FSRS 间隔复习、本地真题库（IndexedDB）。
-学生打开一条链接即用；API Key 只存各自浏览器 localStorage，不上传。
+学生打开一条链接即用；DeepSeek Key 只存服务端 secret，学生凭邀请码走代理，不接触 Key。
+
+**已上线**：学生端 https://goshi-app.pages.dev （打开须邀请码核验），代理 https://goshi-api.pages.dev 。
+邀请码的生成/发放/查用量/吊销见根目录 [`邀测码管理.md`](邀测码管理.md)（一行命令一个操作）。
 
 ## 本地运行
 
@@ -47,8 +50,8 @@ python3 -m http.server 8765
 见 [`proxy/README.md`](proxy/README.md)。要点：
 
 - 主部署走 **Cloudflare Pages Functions**（`proxy-pages/`，国内可达 `*.pages.dev`）；`*.workers.dev` 国内被墙，Worker 版仅作海外备份。服务端代持 `DEEPSEEK_KEY`（secret），学生填邀请码走代理，每码每天 20 次。
-- `node scripts/gen-codes.js N` 生成邀请码 → `codes.json` 上传 KV、`codes.csv` 本地填昵称（均不进 git）。
-- `node scripts/stats.js <PROXY_URL> <ADMIN_CODE>` 打印最近 14 天回访表。
+- `bash scripts/gen-codes.sh N` 一键生成邀请码并上传 KV（`codes.csv` 本地填昵称，均不进 git）；
+  吊销 `bash scripts/revoke-code.sh <码>`，用量 `bash scripts/stats.sh`。详见 [`邀测码管理.md`](邀测码管理.md)。
 - 前端设置 → 内测模式：填邀请码 + 代理地址；保留自带 Key（BYOK）高级选项。
 
 ## 隐私与安全

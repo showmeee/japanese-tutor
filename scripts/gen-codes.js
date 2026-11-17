@@ -23,9 +23,17 @@ while (added.length < N) {
 }
 const merged = old.concat(added);
 fs.writeFileSync(path.join(root, 'codes.json'), JSON.stringify(merged, null, 1));
+// 保留老师在 codes.csv 里填过的昵称备注，重新生成不丢
+const csvNotes = {};
+try {
+  fs.readFileSync(path.join(root, 'codes.csv'), 'utf8').split('\n').slice(1).forEach(line => {
+    const i = line.indexOf(',');
+    if (i > 0) csvNotes[line.slice(0, i)] = line.slice(i + 1);
+  });
+} catch (e) {}
 const csv = ['code,note'].concat(merged.map(e => {
-  let note = '';
-  try { note = (JSON.parse(e.value).note || ''); } catch (err) {}
+  let note = csvNotes[e.key] || '';
+  if (!note) { try { note = JSON.parse(e.value).note || ''; } catch (err) {} }
   return e.key + ',' + note;
 })).join('\n') + '\n';
 fs.writeFileSync(path.join(root, 'codes.csv'), csv);

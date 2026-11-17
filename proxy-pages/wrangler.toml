@@ -8,7 +8,7 @@ kv_namespaces = [
 ]
 
 [vars]
-ALLOWED_ORIGIN = "http://localhost:8765,http://localhost:8766"
+ALLOWED_ORIGIN = "http://localhost:8765,http://localhost:8766,https://goshi-app.pages.dev"
 
 # secret 用命令设置（不进 git）：
 #   wrangler pages secret put DEEPSEEK_KEY --project-name goshi-api
