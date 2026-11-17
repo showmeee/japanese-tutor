@@ -405,13 +405,8 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
         <input type="checkbox" id="settingBeta"> 启用内测模式（走老师代理）
       </label>
       <input class="setting-input" id="settingBetaCode" placeholder="邀请码（老师发放）" autocomplete="off" style="margin-top:8px;">
-      <input class="setting-input" id="settingBetaProxy" type="url" placeholder="代理地址（老师提供，如 https://xxx.workers.dev）" style="margin-top:8px;">
-      <div class="setting-hint">内测模式用邀请码调用老师的限流代理，不需要自己的 Key；下方 Key / API 地址为自带 Key（BYOK）高级选项。</div>
-    </div>
-    <div class="setting-group">
-      <div class="setting-label">DeepSeek API Key</div>
-      <input class="setting-input" id="settingKey" type="password" placeholder="sk-..." autocomplete="off">
-      <div class="setting-hint">从 <a href="https://platform.deepseek.com" target="_blank" style="color:var(--primary)">platform.deepseek.com</a> 获取</div>
+      <input class="setting-input" id="settingBetaProxy" type="url" placeholder="代理地址（老师提供，如 https://xxx.pages.dev）" style="margin-top:8px;">
+      <div class="setting-hint">用老师发放的邀请码调用限流代理，无需自己的 Key；代理地址一般已预填，只需填邀请码。</div>
       <div class="setting-hint" id="storageWarning" style="color:var(--orange);display:none;">⚠️ 无痕模式下设置不会保存，每次需重新输入</div>
     </div>
     <div class="setting-group">
@@ -422,7 +417,7 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
         <option value="__custom__">自定义…</option>
       </select>
       <input class="setting-input" id="settingModel" placeholder="填写模型名" autocomplete="off" spellcheck="false" style="display:none;margin-top:8px;">
-      <div class="setting-hint">flash 快且支持图片，v4-pro 更强但纯文本；拍照题核对识别文字后只发文字，因此也能用 v4-pro 分析。接其他服务时选"自定义"填模型名</div>
+      <div class="setting-hint">flash 快且支持图片，v4-pro 更强但纯文本；拍照题核对识别文字后只发文字，因此也能用 v4-pro 分析。</div>
     </div>
     <div class="setting-group">
       <div class="setting-label">思考强度</div>
@@ -433,10 +428,6 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
         <option value="max">max（深想）</option>
       </select>
       <div class="setting-hint">开启后先思考再回答，更慢也更贵；仅对 DeepSeek 官方接口生效</div>
-    </div>
-    <div class="setting-group">
-      <div class="setting-label">API 地址</div>
-      <input class="setting-input" id="settingApi" type="url" placeholder="https://api.deepseek.com" value="https://api.deepseek.com">
     </div>
     <div class="setting-group">
       <div class="setting-label">上下文模式</div>
@@ -955,8 +946,6 @@ let state = {
   mode: 'qa',
   conversations: {},
   currentId: null,
-  apiKey: '',
-  apiBase: 'https://api.deepseek.com',
   betaMode: false,   // 内测模式：邀请码走老师代理，无需自填 Key
   betaCode: '',
   betaProxy: '',
@@ -1016,7 +1005,7 @@ function init() {
   setupPWA();
   updateInputPlaceholder();
   updateReviewBadge();
-  if (!state.apiKey && !betaActive()) {
+  if (!betaActive()) {
     setTimeout(() => openSettings(), 300);
   }
   renderHistory();
@@ -1060,17 +1049,17 @@ function loadState() {
       Object.assign(state, parsed);
     }
   } catch(e) {}
-  $('#settingKey').value = state.apiKey || '';
+  delete state.apiKey; // BYOK 已下线：清除历史保存的 key，避免残留外发
+  delete state.apiBase;
   if (state.model === 'deepseek-chat' || state.model === 'deepseek-reasoner') {
     state.model = state.model === 'deepseek-chat' ? 'deepseek-flash' : 'deepseek-v4-pro';
     saveState();
     showToast('模型已升级为 ' + state.model);
   }
   syncModelPicker(state.model || 'deepseek-flash');
-  $('#settingApi').value = state.apiBase || 'https://api.deepseek.com';
   $('#settingBeta').checked = !!state.betaMode;
   $('#settingBetaCode').value = state.betaCode || '';
-  $('#settingBetaProxy').value = state.betaProxy || '';
+  $('#settingBetaProxy').value = state.betaProxy || BETA_PROXY_DEFAULT;
   if (!state.reasoningEffort) state.reasoningEffort = 'none';
   $('#settingEffort').value = state.reasoningEffort;
   if (state.furigana === undefined) state.furigana = true;
@@ -1080,6 +1069,7 @@ function loadState() {
   $('#settingExampleVoice').value = state.exampleVoice;
   updateModeButtons();
   updateFuriganaBtn();
+  saveState(); // 立即落盘：清除历史 apiKey/apiBase 残留
 }
 
 function syncModelPicker(model) {
@@ -1129,8 +1119,6 @@ function saveState() {
     localStorage.setItem('goshi_state_v2', JSON.stringify({
       conversations: state.conversations,
       currentId: state.currentId,
-      apiKey: state.apiKey,
-      apiBase: state.apiBase,
       model: state.model,
       mode: state.mode,
       reviewCards: state.reviewCards,
@@ -1139,6 +1127,9 @@ function saveState() {
       ttsRate: state.ttsRate,
       exampleVoice: state.exampleVoice,
       reasoningEffort: state.reasoningEffort,
+      betaMode: state.betaMode,
+      betaCode: state.betaCode,
+      betaProxy: state.betaProxy,
     }));
     return true;
   } catch(e) {
@@ -1859,12 +1850,12 @@ function injectRelevantKnowledge(userText, convMessages) {
 
 // ─── API Call ─────────────────────────────────────────────────
 // ─── 内测代理（邀请码）─────────────────────────────
-const BETA_PROXY_DEFAULT = ''; // 老师部署 Workers 后可填默认代理地址；留空则需在设置里手动填
+const BETA_PROXY_DEFAULT = 'https://goshi-api.pages.dev';
 function betaProxyBase() { return (state.betaProxy || BETA_PROXY_DEFAULT).replace(/\/$/, ''); }
 function betaActive() { return !!(state.betaMode && state.betaCode && betaProxyBase()); }
-function apiBaseEffective() { return betaActive() ? betaProxyBase() : state.apiBase; }
-function apiAuthHeaders() { return betaActive() ? { 'X-Invite-Code': state.betaCode } : { 'Authorization': 'Bearer ' + state.apiKey }; }
-function isDeepseekBackend() { return betaActive() || /deepseek\.com/.test(state.apiBase); }
+function apiBaseEffective() { return betaProxyBase(); }
+function apiAuthHeaders() { return { 'X-Invite-Code': state.betaCode }; }
+function isDeepseekBackend() { return true; }
 function deviceUUID() {
   let u = localStorage.getItem('goshi_device_uuid');
   if (!u) {
@@ -1889,7 +1880,7 @@ async function sendMessage(opts = {}) {
   const text = inputText.value.trim();
   const imageData = state.pendingImage;
   if (!text && !imageData) return;
-  if (!state.apiKey && !betaActive()) { openSettings(); showToast('请先设置 API Key 或开启内测模式'); return; }
+  if (!betaActive()) { openSettings(); showToast('请先在设置里启用内测并填写邀请码'); return; }
 
   inputText.value = '';
   inputText.style.height = 'auto';
@@ -2202,9 +2193,9 @@ function confirmCrop(whole) {
   imagePreview.classList.add('show');
   btnSend.disabled = false;
   if (state.mode !== 'exam') switchMode('exam');
-  if (!state.apiKey && !betaActive()) {
+  if (!betaActive()) {
     openSettings();
-    showToast('请先设置 API Key 或开启内测模式');
+    showToast('请先在设置里启用内测并填写邀请码');
     return;
   }
   startOcr(dataUrl);
@@ -2829,7 +2820,6 @@ function openSettings() {
   }
 }
 function saveSettings() {
-  state.apiKey = $('#settingKey').value.trim();
   const picked = $('#settingModelPick').value;
   state.model = picked === '__custom__'
     ? ($('#settingModel').value.trim() || 'deepseek-flash')
@@ -2837,7 +2827,6 @@ function saveSettings() {
   if (picked === '__custom__' && !$('#settingModel').value.trim()) {
     syncModelPicker(state.model);
   }
-  state.apiBase = $('#settingApi').value.trim().replace(/\/$/, '');
   state.betaMode = $('#settingBeta').checked;
   state.betaCode = $('#settingBetaCode').value.trim();
   state.betaProxy = $('#settingBetaProxy').value.trim().replace(/\/$/, '');
@@ -2855,19 +2844,15 @@ async function testApiConnection() {
   const resultEl = $('#testResult');
   const btn = $('#testConnection');
   resultEl.style.whiteSpace = 'pre-line';
-  const apiKey = $('#settingKey').value.trim();
-  const apiBase = $('#settingApi').value.trim().replace(/\/$/, '');
   const betaOn = $('#settingBeta').checked;
   const betaCode = $('#settingBetaCode').value.trim();
-  const betaProxy = $('#settingBetaProxy').value.trim().replace(/\/$/, '');
-  const useBeta = !!(betaOn && betaCode && betaProxy);
-  const base = useBeta ? betaProxy : apiBase;
-  const hdrs = useBeta ? { 'X-Invite-Code': betaCode } : { 'Authorization': 'Bearer ' + apiKey };
+  const base = ($('#settingBetaProxy').value.trim() || BETA_PROXY_DEFAULT).replace(/\/$/, '');
+  const hdrs = { 'X-Invite-Code': betaCode };
 
-  if (!useBeta && !apiKey) {
+  if (!betaOn || !betaCode) {
     resultEl.style.display = 'block';
     resultEl.style.color = 'var(--red)';
-    resultEl.textContent = '❌ 请先输入 API Key，或开启内测模式并填写邀请码/代理地址';
+    resultEl.textContent = '❌ 请启用内测模式并填写邀请码';
     return;
   }
 
