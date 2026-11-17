@@ -52,7 +52,7 @@ Key 只存在服务端 secret，按码每日限 20 次，不记录聊天内容�
 | 方法 | 路径 | 鉴权 | 说明 |
 | --- | --- | --- | --- |
 | POST | `/v1/chat/completions` | `X-Invite-Code` | 流式转发 DeepSeek，原样返回 |
-| GET | `/v1/models` | `X-Invite-Code` | 转发模型列表（测试连接用） |
+| GET | `/v1/models` | `X-Invite-Code` | 邀请码核验（前端门禁）/测试连接，**不消耗每日次数** |
 | POST | `/event` | `X-Invite-Code` | 匿名事件 `{code,event,device}`，如 `review_done` |
 | GET | `/stats` | `X-Admin-Code` | 最近 14 天按天聚合：请求数/活跃码/每码分布/事件数 |
 

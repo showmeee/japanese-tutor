@@ -298,6 +298,17 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
 .bank-import-result.show { display: block; }
 .bs-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(0.8); background: rgba(0,0,0,0.75); color: #fff; padding: 10px 20px; border-radius: 10px; font-size: 14px; z-index: 999; opacity: 0; transition: all 0.25s ease; pointer-events: none; }
+#inviteGate { display: none; position: fixed; inset: 0; z-index: 500; background: var(--bg); align-items: center; justify-content: center; padding: 24px; }
+#inviteGate.show { display: flex; }
+.gate-card { width: 100%; max-width: 340px; text-align: center; }
+.gate-logo { font-size: 44px; font-weight: 700; color: var(--primary); letter-spacing: 4px; }
+.gate-sub { font-size: 14px; color: var(--text2); margin: 6px 0 28px; }
+#gateCode { text-align: center; font-size: 18px; letter-spacing: 2px; text-transform: uppercase; }
+#gateBtn { width: 100%; margin-top: 12px; }
+#gateMsg { font-size: 13px; color: var(--red); margin-top: 10px; min-height: 18px; }
+.gate-hint { font-size: 12px; color: var(--text2); margin-top: 18px; line-height: 1.7; }
+.teacher-only { display: none !important; }
+body.teacher-mode .teacher-only { display: block !important; }
 .toast.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
 .hidden { display: none !important; }
@@ -311,6 +322,18 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
 </style>
 </head>
 <body>
+<!-- 邀请码门禁：进来先核验，不填不能用 -->
+<div id="inviteGate">
+  <div class="gate-card">
+    <div class="gate-logo">語師</div>
+    <div class="gate-sub">日语学习助手 · 邀测版</div>
+    <input class="setting-input" id="gateCode" placeholder="输入老师发放的邀请码" autocomplete="off" autocapitalize="characters" spellcheck="false">
+    <button class="setting-btn primary" id="gateBtn">验证并进入</button>
+    <div id="gateMsg"></div>
+    <div class="gate-hint">没有邀请码？请向老师索取。<br>每个邀请码每天最多 20 次 AI 问答。</div>
+    <div class="gate-hint" id="gateStorageWarn" style="color:var(--orange);display:none;">⚠️ 无痕模式下邀请码不会保存，每次打开需重新输入</div>
+  </div>
+</div>
 <div id="app">
   <div class="header">
     <button class="header-btn" id="btnSidebar" aria-label="历史会话">☰</button>
@@ -398,18 +421,22 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
 <div class="modal-overlay" id="settingsModal">
   <div class="modal" style="position:relative;">
     <button class="modal-close" id="closeSettings">✕</button>
-    <h3>设置</h3>
+    <h3 id="settingsTitle">设置</h3>
     <div class="setting-group">
-      <div class="setting-label">邀测模式（邀请码，无需自填 Key）</div>
-      <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text2);">
-        <input type="checkbox" id="settingBeta"> 启用邀测模式（走老师代理）
-      </label>
-      <input class="setting-input" id="settingBetaCode" placeholder="邀请码（老师发放）" autocomplete="off" style="margin-top:8px;">
-      <input class="setting-input" id="settingBetaProxy" type="url" placeholder="代理地址（老师提供，如 https://xxx.pages.dev）" style="margin-top:8px;">
-      <div class="setting-hint">用老师发放的邀请码调用限流代理，无需自己的 Key；代理地址一般已预填，只需填邀请码。</div>
+      <div class="setting-label">邀请码</div>
+      <input class="setting-input" id="settingBetaCode" placeholder="邀请码（老师发放）" autocomplete="off" autocapitalize="characters" spellcheck="false">
+      <div class="setting-hint" id="inviteStatus"></div>
+      <div class="setting-hint">老师发放，每天最多 20 次 AI 问答。换新码后点「保存」会自动核验。</div>
+      <div class="teacher-only">
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text2);margin-top:8px;">
+          <input type="checkbox" id="settingBeta"> 启用邀测模式（走老师代理）
+        </label>
+        <input class="setting-input" id="settingBetaProxy" type="url" placeholder="代理地址（老师提供，如 https://xxx.pages.dev）" style="margin-top:8px;">
+        <div class="setting-hint">用老师发放的邀请码调用限流代理，无需自己的 Key；代理地址一般已预填，只需填邀请码。</div>
+      </div>
       <div class="setting-hint" id="storageWarning" style="color:var(--orange);display:none;">⚠️ 无痕模式下设置不会保存，每次需重新输入</div>
     </div>
-    <div class="setting-group">
+    <div class="setting-group teacher-only">
       <div class="setting-label">模型</div>
       <select class="setting-select" id="settingModelPick">
         <option value="deepseek-flash">deepseek-flash（快，支持图片）</option>
@@ -419,7 +446,7 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
       <input class="setting-input" id="settingModel" placeholder="填写模型名" autocomplete="off" spellcheck="false" style="display:none;margin-top:8px;">
       <div class="setting-hint">flash 快且支持图片，v4-pro 更强但纯文本；拍照题核对识别文字后只发文字，因此也能用 v4-pro 分析。</div>
     </div>
-    <div class="setting-group">
+    <div class="setting-group teacher-only">
       <div class="setting-label">思考强度</div>
       <select class="setting-select" id="settingEffort">
         <option value="none">关闭（最快）</option>
@@ -429,7 +456,7 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
       </select>
       <div class="setting-hint">开启后先思考再回答，更慢也更贵；仅对 DeepSeek 官方接口生效</div>
     </div>
-    <div class="setting-group">
+    <div class="setting-group teacher-only">
       <div class="setting-label">上下文模式</div>
       <div style="display:flex;gap:8px;">
         <button class="setting-btn" id="modeNormal" style="flex:1;background:var(--primary);color:#fff;margin:0;">标准 (省token)</button>
@@ -455,13 +482,15 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
       </select>
       <div class="setting-hint">注音会把「漢字[かんじ]」显示为振假名。语法例句用预录的自然语音，AI 回答用系统语音；iOS 可在 设置 → 辅助功能 → 朗读内容 → 声音 → 日语 中下载「Kyoko（增强）」，系统语音会自动优先使用它。</div>
     </div>
-    <div class="setting-group">
+    <div class="setting-group teacher-only">
       <div class="setting-label">Token 估算</div>
       <div id="tokenEstimate" style="font-size:14px;color:var(--text2);padding:8px 12px;background:var(--card);border-radius:8px;border:1px solid var(--sep);">发送消息后显示估算</div>
       <div class="setting-hint">1 token ≈ 1.5个中文字 / 4个英文字母。DeepSeek 按token计费。</div>
     </div>
-    <button class="setting-btn" id="testConnection" style="background:var(--teal);color:#fff;margin-bottom:8px;">🔌 测试连接</button>
-    <div id="testResult" style="font-size:13px;padding:10px 12px;background:var(--card);border-radius:8px;border:1px solid var(--sep);margin-bottom:12px;display:none;"></div>
+    <div class="teacher-only">
+      <button class="setting-btn" id="testConnection" style="background:var(--teal);color:#fff;margin-bottom:8px;">🔌 测试连接</button>
+      <div id="testResult" style="font-size:13px;padding:10px 12px;background:var(--card);border-radius:8px;border:1px solid var(--sep);margin-bottom:12px;display:none;"></div>
+    </div>
     <button class="setting-btn primary" id="saveSettings">保存</button>
     <button class="setting-btn secondary" id="exportData">导出学习数据</button>
     <button class="setting-btn danger" id="clearAll">清除所有对话记录</button>
@@ -949,6 +978,8 @@ let state = {
   betaMode: true,    // 邀测模式默认开：陌生人只需填邀请码
   betaCode: '',
   betaProxy: '',
+  betaVerified: false, // 邀请码须在线核验通过才能使用
+  teacherMode: false,  // 教师模式：显示全部高级设置（学生默认隐藏）
   model: 'deepseek-flash',
   generating: false,
   abortController: null,
@@ -1005,8 +1036,15 @@ function init() {
   setupPWA();
   updateInputPlaceholder();
   updateReviewBadge();
+  if (new URLSearchParams(location.search).get('teacher') === '1' && !state.teacherMode) {
+    state.teacherMode = true;
+    saveState();
+  }
+  applyTeacherMode();
   if (!betaActive()) {
-    setTimeout(() => openSettings(), 300);
+    showInviteGate();
+  } else {
+    silentRecheck();
   }
   renderHistory();
   bankLoadBuiltin().catch(e => console.warn('builtin bank load failed:', e));
@@ -1130,6 +1168,8 @@ function saveState() {
       betaMode: state.betaMode,
       betaCode: state.betaCode,
       betaProxy: state.betaProxy,
+      betaVerified: state.betaVerified,
+      teacherMode: state.teacherMode,
     }));
     return true;
   } catch(e) {
@@ -1186,6 +1226,22 @@ function bindEvents() {
   $('#btnSettings').addEventListener('click', openSettings);
   $('#closeSettings').addEventListener('click', () => settingsModal.classList.remove('show'));
   settingsModal.addEventListener('click', e => { if (e.target === settingsModal) settingsModal.classList.remove('show'); });
+  gateBtn.addEventListener('click', gateSubmit);
+  gateCode.addEventListener('keydown', e => { if (e.key === 'Enter') gateSubmit(); });
+  // 连点「设置」标题 5 下切换教师模式（也可用 ?teacher=1 进入）
+  let titleTaps = 0, titleTapTimer = null;
+  $('#settingsTitle').addEventListener('click', () => {
+    titleTaps++;
+    clearTimeout(titleTapTimer);
+    titleTapTimer = setTimeout(() => titleTaps = 0, 1500);
+    if (titleTaps >= 5) {
+      titleTaps = 0;
+      state.teacherMode = !state.teacherMode;
+      saveState();
+      applyTeacherMode();
+      showToast(state.teacherMode ? '教师模式：已显示全部设置' : '已回到学生视图');
+    }
+  });
   $('#saveSettings').addEventListener('click', saveSettings);
   $('#testConnection').addEventListener('click', testApiConnection);
   $('#clearAll').addEventListener('click', clearAllData);
@@ -1852,7 +1908,7 @@ function injectRelevantKnowledge(userText, convMessages) {
 // ─── 邀测代理（邀请码）─────────────────────────────
 const BETA_PROXY_DEFAULT = 'https://goshi-api.pages.dev';
 function betaProxyBase() { return (state.betaProxy || BETA_PROXY_DEFAULT).replace(/\/$/, ''); }
-function betaActive() { return !!(state.betaMode && state.betaCode && betaProxyBase()); }
+function betaActive() { return !!(state.betaMode && state.betaCode && state.betaVerified && betaProxyBase()); }
 function apiBaseEffective() { return betaProxyBase(); }
 function apiAuthHeaders() { return { 'X-Invite-Code': state.betaCode }; }
 function isDeepseekBackend() { return true; }
@@ -1876,11 +1932,83 @@ function sendBetaEvent(name) {
   } catch (e) {}
 }
 
+// ─── 邀请码门禁 ─────────────────────────────────────────────
+const inviteGate = $('#inviteGate');
+const gateCode = $('#gateCode');
+const gateBtn = $('#gateBtn');
+const gateMsg = $('#gateMsg');
+
+function showInviteGate(msg) {
+  gateMsg.textContent = msg || '';
+  gateCode.value = state.betaCode || '';
+  inviteGate.classList.add('show');
+  if (!storageAvailable) $('#gateStorageWarn').style.display = 'block';
+  setTimeout(() => gateCode.focus(), 100);
+}
+function hideInviteGate() { inviteGate.classList.remove('show'); }
+
+// 核验走 /v1/models：只验码，不消耗每日次数
+async function verifyCodeStatus(code, base) {
+  const resp = await fetch((base || betaProxyBase()) + '/v1/models', {
+    headers: { 'X-Invite-Code': code },
+  });
+  return resp.status;
+}
+
+async function gateSubmit() {
+  const code = gateCode.value.trim();
+  if (!code) { gateMsg.textContent = '请输入邀请码'; return; }
+  gateBtn.disabled = true;
+  gateBtn.textContent = '验证中…';
+  gateMsg.textContent = '';
+  try {
+    const st = await verifyCodeStatus(code);
+    if (st === 200) {
+      state.betaCode = code;
+      state.betaMode = true;
+      state.betaVerified = true;
+      saveState();
+      hideInviteGate();
+      showToast('✅ 验证通过，欢迎使用語師');
+    } else if (st === 403) {
+      gateMsg.textContent = '邀请码不正确或已失效，请向老师核对';
+    } else if (st === 429) {
+      gateMsg.textContent = '该码今日次数已用完，请明天再试';
+    } else {
+      gateMsg.textContent = '服务器异常（' + st + '），请稍后重试';
+    }
+  } catch (e) {
+    gateMsg.textContent = '无法连接服务器，请检查网络后重试';
+  } finally {
+    gateBtn.disabled = false;
+    gateBtn.textContent = '验证并进入';
+  }
+}
+
+// 已验证用户每次进入后台复查：码被老师吊销时重新弹门禁；断网不打扰
+function silentRecheck() {
+  verifyCodeStatus(state.betaCode).then(st => {
+    if (st === 403) {
+      state.betaVerified = false;
+      saveState();
+      showInviteGate('邀请码已失效，请输入新的邀请码');
+    }
+  }).catch(() => {});
+}
+
+// ─── 教师模式 ───────────────────────────────────────────────
+function teacherOn() {
+  return !!(state.teacherMode || new URLSearchParams(location.search).get('teacher') === '1');
+}
+function applyTeacherMode() {
+  document.body.classList.toggle('teacher-mode', teacherOn());
+}
+
 async function sendMessage(opts = {}) {
   const text = inputText.value.trim();
   const imageData = state.pendingImage;
   if (!text && !imageData) return;
-  if (!betaActive()) { openSettings(); showToast('请先在设置里启用邀测并填写邀请码'); return; }
+  if (!betaActive()) { showInviteGate('请先输入邀请码'); return; }
 
   inputText.value = '';
   inputText.style.height = 'auto';
@@ -2194,8 +2322,7 @@ function confirmCrop(whole) {
   btnSend.disabled = false;
   if (state.mode !== 'exam') switchMode('exam');
   if (!betaActive()) {
-    openSettings();
-    showToast('请先在设置里启用邀测并填写邀请码');
+    showInviteGate('请先输入邀请码');
     return;
   }
   startOcr(dataUrl);
@@ -2813,13 +2940,33 @@ function renderBankReports() {
 // ─── Settings ─────────────────────────────────────────────────
 function openSettings() {
   settingsModal.classList.add('show');
+  $('#inviteStatus').textContent = state.betaVerified ? '✅ 当前邀请码已核验' : '⚠️ 尚未核验';
+  $('#inviteStatus').style.color = state.betaVerified ? 'var(--green)' : 'var(--orange)';
   // Show storage warning if localStorage is not available
   const warning = $('#storageWarning');
   if (warning && !storageAvailable) {
     warning.style.display = 'block';
   }
 }
-function saveSettings() {
+async function saveSettings() {
+  const newCode = $('#settingBetaCode').value.trim();
+  if (!teacherOn()) {
+    if (!newCode) { showToast('邀请码不能为空'); return; }
+    if (newCode !== state.betaCode || !state.betaVerified) {
+      showToast('正在核验新邀请码…');
+      try {
+        const st = await verifyCodeStatus(newCode);
+        if (st !== 200) {
+          showToast(st === 403 ? '❌ 邀请码不正确或已失效' : '❌ 核验失败（' + st + '），未保存');
+          return;
+        }
+        state.betaVerified = true;
+      } catch (e) {
+        showToast('❌ 无法连接服务器，邀请码未更改');
+        return;
+      }
+    }
+  }
   const picked = $('#settingModelPick').value;
   state.model = picked === '__custom__'
     ? ($('#settingModel').value.trim() || 'deepseek-flash')
@@ -2827,8 +2974,8 @@ function saveSettings() {
   if (picked === '__custom__' && !$('#settingModel').value.trim()) {
     syncModelPicker(state.model);
   }
-  state.betaMode = $('#settingBeta').checked;
-  state.betaCode = $('#settingBetaCode').value.trim();
+  state.betaMode = teacherOn() ? $('#settingBeta').checked : true;
+  state.betaCode = newCode;
   state.betaProxy = $('#settingBetaProxy').value.trim().replace(/\/$/, '');
   state.reasoningEffort = $('#settingEffort').value;
   const saved = saveState();
@@ -2852,7 +2999,7 @@ async function testApiConnection() {
   if (!betaOn || !betaCode) {
     resultEl.style.display = 'block';
     resultEl.style.color = 'var(--red)';
-    resultEl.textContent = '❌ 请启用邀测模式并填写邀请码';
+    resultEl.textContent = '❌ 请填写邀请码';
     return;
   }
 

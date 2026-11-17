@@ -84,9 +84,12 @@ export default {
     if (isChat || isModels) {
       const code = request.headers.get('X-Invite-Code') || '';
       if (!(await inviteValid(env, code))) return json({ error: 'invalid invite' }, 403, cors);
-      const n = await bumpRate(env, code);
-      if (n > DAY_LIMIT) return json({ error: 'daily limit exceeded' }, 429, cors);
-      await bumpStats(env, code, 'req');
+      // /v1/models 仅作邀请码核验，不消耗每日次数；只有真实问答计次
+      if (isChat) {
+        const n = await bumpRate(env, code);
+        if (n > DAY_LIMIT) return json({ error: 'daily limit exceeded' }, 429, cors);
+        await bumpStats(env, code, 'req');
+      }
       const upstream = await fetch(DEEPSEEK_BASE + path, {
         method: request.method,
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + env.DEEPSEEK_KEY },
