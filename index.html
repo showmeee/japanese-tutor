@@ -400,9 +400,9 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
     <button class="modal-close" id="closeSettings">✕</button>
     <h3>设置</h3>
     <div class="setting-group">
-      <div class="setting-label">内测模式（邀请码，无需自填 Key）</div>
+      <div class="setting-label">邀测模式（邀请码，无需自填 Key）</div>
       <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text2);">
-        <input type="checkbox" id="settingBeta"> 启用内测模式（走老师代理）
+        <input type="checkbox" id="settingBeta"> 启用邀测模式（走老师代理）
       </label>
       <input class="setting-input" id="settingBetaCode" placeholder="邀请码（老师发放）" autocomplete="off" style="margin-top:8px;">
       <input class="setting-input" id="settingBetaProxy" type="url" placeholder="代理地址（老师提供，如 https://xxx.pages.dev）" style="margin-top:8px;">
@@ -946,7 +946,7 @@ let state = {
   mode: 'qa',
   conversations: {},
   currentId: null,
-  betaMode: false,   // 内测模式：邀请码走老师代理，无需自填 Key
+  betaMode: true,    // 邀测模式默认开：陌生人只需填邀请码
   betaCode: '',
   betaProxy: '',
   model: 'deepseek-flash',
@@ -1849,7 +1849,7 @@ function injectRelevantKnowledge(userText, convMessages) {
 }
 
 // ─── API Call ─────────────────────────────────────────────────
-// ─── 内测代理（邀请码）─────────────────────────────
+// ─── 邀测代理（邀请码）─────────────────────────────
 const BETA_PROXY_DEFAULT = 'https://goshi-api.pages.dev';
 function betaProxyBase() { return (state.betaProxy || BETA_PROXY_DEFAULT).replace(/\/$/, ''); }
 function betaActive() { return !!(state.betaMode && state.betaCode && betaProxyBase()); }
@@ -1880,7 +1880,7 @@ async function sendMessage(opts = {}) {
   const text = inputText.value.trim();
   const imageData = state.pendingImage;
   if (!text && !imageData) return;
-  if (!betaActive()) { openSettings(); showToast('请先在设置里启用内测并填写邀请码'); return; }
+  if (!betaActive()) { openSettings(); showToast('请先在设置里启用邀测并填写邀请码'); return; }
 
   inputText.value = '';
   inputText.style.height = 'auto';
@@ -2195,7 +2195,7 @@ function confirmCrop(whole) {
   if (state.mode !== 'exam') switchMode('exam');
   if (!betaActive()) {
     openSettings();
-    showToast('请先在设置里启用内测并填写邀请码');
+    showToast('请先在设置里启用邀测并填写邀请码');
     return;
   }
   startOcr(dataUrl);
@@ -2852,7 +2852,7 @@ async function testApiConnection() {
   if (!betaOn || !betaCode) {
     resultEl.style.display = 'block';
     resultEl.style.color = 'var(--red)';
-    resultEl.textContent = '❌ 请启用内测模式并填写邀请码';
+    resultEl.textContent = '❌ 请启用邀测模式并填写邀请码';
     return;
   }
 
