@@ -6,3 +6,6 @@ codes.json
 
 # 依赖
 node_modules/
+
+# wrangler 本地构建/模拟状态
+.wrangler/
