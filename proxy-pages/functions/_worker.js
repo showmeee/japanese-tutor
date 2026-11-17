@@ -12,7 +12,7 @@ function corsHeaders(origin, env) {
   if (origin && allow.includes(origin)) {
     h['Access-Control-Allow-Origin'] = origin;
     h['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS';
-    h['Access-Control-Allow-Headers'] = 'Content-Type,Authorization,X-Invite-Code,X-Admin-Code';
+    h['Access-Control-Allow-Headers'] = 'Content-Type,Authorization,X-Invite-Code,X-Admin-Code,X-Device-Id';
     h['Access-Control-Max-Age'] = '86400';
   }
   return h;
@@ -28,6 +28,17 @@ async function inviteMeta(env, code) {
   const raw = await env.INVITES.get(code);
   if (raw === null) return null;
   try { return JSON.parse(raw) || {}; } catch (e) { return {}; }
+}
+// 一码一设备：首个激活设备写入 meta.device，之后其他设备一律 403。
+// 教师码不绑定（老师可能多设备）；无设备头的旧客户端在码未绑定时仍可用。
+async function checkDevice(env, code, meta, device) {
+  if (meta.teacher) return true;
+  if (meta.device) return meta.device === device;
+  if (device) {
+    meta.device = device;
+    await env.INVITES.put(code, JSON.stringify(meta));
+  }
+  return true;
 }
 async function bumpRate(env, code) {
   const k = 'rl:' + code + ':' + dayKey();
@@ -73,7 +84,11 @@ export default {
 
     if (path === '/event' && request.method === 'POST') {
       const code = request.headers.get('X-Invite-Code') || '';
-      if (!(await inviteMeta(env, code))) return json({ error: 'invalid invite' }, 403, cors);
+      const meta = await inviteMeta(env, code);
+      if (!meta) return json({ error: 'invalid invite' }, 403, cors);
+      if (!(await checkDevice(env, code, meta, request.headers.get('X-Device-Id') || ''))) {
+        return json({ error: 'code bound to another device' }, 403, cors);
+      }
       let body = {};
       try { body = await request.json(); } catch (e) {}
       const name = String(body.event || '').slice(0, 40);
@@ -87,6 +102,9 @@ export default {
       const code = request.headers.get('X-Invite-Code') || '';
       const meta = await inviteMeta(env, code);
       if (!meta) return json({ error: 'invalid invite' }, 403, cors);
+      if (!(await checkDevice(env, code, meta, request.headers.get('X-Device-Id') || ''))) {
+        return json({ error: 'code bound to another device' }, 403, cors);
+      }
       // /v1/models 仅作邀请码核验，不消耗每日次数；只有真实问答计次
       // 教师码（KV value 带 teacher:true）不限次，但仍计入统计
       if (isChat) {

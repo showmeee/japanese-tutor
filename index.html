@@ -330,7 +330,7 @@ body.teacher-mode .teacher-only { display: block !important; }
     <input class="setting-input" id="gateCode" placeholder="输入老师发放的邀请码" autocomplete="off" autocapitalize="characters" spellcheck="false">
     <button class="setting-btn primary" id="gateBtn">验证并进入</button>
     <div id="gateMsg"></div>
-    <div class="gate-hint">没有邀请码？请向老师索取。<br>每个邀请码每天最多 20 次 AI 问答。</div>
+    <div class="gate-hint">没有邀请码？请向老师索取。<br>每个邀请码每天最多 20 次 AI 问答，仅限首次激活的设备使用。</div>
     <div class="gate-hint" id="gateStorageWarn" style="color:var(--orange);display:none;">⚠️ 无痕模式下邀请码不会保存，每次打开需重新输入</div>
   </div>
 </div>
@@ -1910,22 +1910,28 @@ const BETA_PROXY_DEFAULT = 'https://goshi-api.pages.dev';
 function betaProxyBase() { return (state.betaProxy || BETA_PROXY_DEFAULT).replace(/\/$/, ''); }
 function betaActive() { return !!(state.betaMode && state.betaCode && state.betaVerified && betaProxyBase()); }
 function apiBaseEffective() { return betaProxyBase(); }
-function apiAuthHeaders() { return { 'X-Invite-Code': state.betaCode }; }
+function apiAuthHeaders() { return { 'X-Invite-Code': state.betaCode, 'X-Device-Id': deviceUUID() }; }
 function isDeepseekBackend() { return true; }
+let memDeviceUUID = null; // 无痕模式 localStorage 不可用时的内存兜底，保证会话内设备 ID 稳定
 function deviceUUID() {
-  let u = localStorage.getItem('goshi_device_uuid');
-  if (!u) {
-    u = (crypto.randomUUID ? crypto.randomUUID() : 'd-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
-    localStorage.setItem('goshi_device_uuid', u);
+  try {
+    let u = localStorage.getItem('goshi_device_uuid');
+    if (!u) {
+      u = (crypto.randomUUID ? crypto.randomUUID() : 'd-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
+      localStorage.setItem('goshi_device_uuid', u);
+    }
+    return u;
+  } catch (e) {
+    if (!memDeviceUUID) memDeviceUUID = 'd-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+    return memDeviceUUID;
   }
-  return u;
 }
 function sendBetaEvent(name) {
   if (!betaActive()) return;
   try {
     fetch(betaProxyBase() + '/event', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Invite-Code': state.betaCode },
+      headers: { 'Content-Type': 'application/json', 'X-Invite-Code': state.betaCode, 'X-Device-Id': deviceUUID() },
       body: JSON.stringify({ code: state.betaCode, event: name, device: deviceUUID() }),
       keepalive: true,
     }).catch(() => {});
@@ -1947,12 +1953,14 @@ function showInviteGate(msg) {
 }
 function hideInviteGate() { inviteGate.classList.remove('show'); }
 
-// 核验走 /v1/models：只验码，不消耗每日次数
+// 核验走 /v1/models：只验码，不消耗每日次数；带设备 ID 实现一码一设备绑定
 async function verifyCodeStatus(code, base) {
   const resp = await fetch((base || betaProxyBase()) + '/v1/models', {
-    headers: { 'X-Invite-Code': code },
+    headers: { 'X-Invite-Code': code, 'X-Device-Id': deviceUUID() },
   });
-  return resp.status;
+  let err = '';
+  try { err = (await resp.json()).error || ''; } catch (e) {}
+  return { status: resp.status, err };
 }
 
 async function gateSubmit() {
@@ -1962,20 +1970,22 @@ async function gateSubmit() {
   gateBtn.textContent = '验证中…';
   gateMsg.textContent = '';
   try {
-    const st = await verifyCodeStatus(code);
-    if (st === 200) {
+    const r = await verifyCodeStatus(code);
+    if (r.status === 200) {
       state.betaCode = code;
       state.betaMode = true;
       state.betaVerified = true;
       saveState();
       hideInviteGate();
       showToast('✅ 验证通过，欢迎使用語師');
-    } else if (st === 403) {
+    } else if (r.status === 403 && r.err.includes('bound')) {
+      gateMsg.textContent = '该邀请码已绑定其他设备，请向老师索取新码';
+    } else if (r.status === 403) {
       gateMsg.textContent = '邀请码不正确或已失效，请向老师核对';
-    } else if (st === 429) {
+    } else if (r.status === 429) {
       gateMsg.textContent = '该码今日次数已用完，请明天再试';
     } else {
-      gateMsg.textContent = '服务器异常（' + st + '），请稍后重试';
+      gateMsg.textContent = '服务器异常（' + r.status + '），请稍后重试';
     }
   } catch (e) {
     gateMsg.textContent = '无法连接服务器，请检查网络后重试';
@@ -1987,11 +1997,11 @@ async function gateSubmit() {
 
 // 已验证用户每次进入后台复查：码被老师吊销时重新弹门禁；断网不打扰
 function silentRecheck() {
-  verifyCodeStatus(state.betaCode).then(st => {
-    if (st === 403) {
+  verifyCodeStatus(state.betaCode).then(r => {
+    if (r.status === 403) {
       state.betaVerified = false;
       saveState();
-      showInviteGate('邀请码已失效，请输入新的邀请码');
+      showInviteGate(r.err.includes('bound') ? '该邀请码已绑定其他设备，请输入新的邀请码' : '邀请码已失效，请输入新的邀请码');
     }
   }).catch(() => {});
 }
@@ -2955,9 +2965,11 @@ async function saveSettings() {
     if (newCode !== state.betaCode || !state.betaVerified) {
       showToast('正在核验新邀请码…');
       try {
-        const st = await verifyCodeStatus(newCode);
-        if (st !== 200) {
-          showToast(st === 403 ? '❌ 邀请码不正确或已失效' : '❌ 核验失败（' + st + '），未保存');
+        const r = await verifyCodeStatus(newCode);
+        if (r.status !== 200) {
+          showToast(r.status === 403
+            ? (r.err.includes('bound') ? '❌ 该码已绑定其他设备，请向老师索取新码' : '❌ 邀请码不正确或已失效')
+            : '❌ 核验失败（' + r.status + '），未保存');
           return;
         }
         state.betaVerified = true;
@@ -2994,7 +3006,7 @@ async function testApiConnection() {
   const betaOn = $('#settingBeta').checked;
   const betaCode = $('#settingBetaCode').value.trim();
   const base = ($('#settingBetaProxy').value.trim() || BETA_PROXY_DEFAULT).replace(/\/$/, '');
-  const hdrs = { 'X-Invite-Code': betaCode };
+  const hdrs = { 'X-Invite-Code': betaCode, 'X-Device-Id': deviceUUID() };
 
   if (!betaOn || !betaCode) {
     resultEl.style.display = 'block';

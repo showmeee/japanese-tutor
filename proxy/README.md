@@ -60,6 +60,10 @@ Key 只存在服务端 secret，按码每日限 20 次，不记录聊天内容�
 **教师码不限次**：KV value 带 `"teacher": true` 的码跳过限次（仍计统计），用 `bash scripts/gen-codes.sh 1 teacher` 生成。
 `/v1/models` 只验码不计次。错码 / 缺码返回 403。`/stats` 无口令或错口令返回 403。
 
+**一码一设备**：前端每次请求带 `X-Device-Id`（localStorage 持久 UUID）。普通码首个激活设备写入
+KV value 的 `device` 字段，之后其他设备（或缺设备头）一律 403 `code bound to another device`；
+教师码（`teacher:true`）不绑定。学生换设备：吊销旧码、发新码（不做解绑）。
+
 ## 查看回访表
 
 ```bash
