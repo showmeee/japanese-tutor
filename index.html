@@ -319,7 +319,23 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
 .bd-expl-text::-webkit-scrollbar { width: 6px; }
 .bd-expl-text::-webkit-scrollbar-thumb { background: var(--sep); border-radius: 3px; }
 .bd-actions { display: flex; gap: 8px; margin-top: 14px; }
-.bd-actions .setting-btn { flex: 1; margin-top: 0; }
+.bd-actions .setting-btn { flex: 1; margin-top: 0; font-size: 14px; padding: 10px 6px; }
+.bank-hit { cursor: pointer; }
+.bank-hit:hover { background: rgba(0,122,255,0.16); }
+.bank-hit-open { font-weight: 600; white-space: nowrap; }
+.bi-flash { animation: biFlash 1.8s ease; }
+@keyframes biFlash {
+  0% { background: rgba(0,122,255,0.22); border-color: var(--primary); }
+  60% { background: rgba(0,122,255,0.12); border-color: var(--primary); }
+  100% { background: var(--card); border-color: var(--sep); }
+}
+.bd-similar { display: flex; flex-direction: column; gap: 6px; }
+.bd-sim { display: flex; gap: 8px; align-items: flex-start; text-align: left; padding: 8px 10px; background: var(--card); border: 1px solid var(--sep); border-radius: 8px; cursor: pointer; font-family: inherit; transition: border-color .15s, transform .05s; }
+.bd-sim:hover { border-color: var(--primary); }
+.bd-sim:active { transform: scale(0.98); }
+.bd-sim-score { flex: none; font-size: 11px; font-weight: 700; color: var(--primary); background: var(--primary-light); border-radius: 999px; padding: 2px 7px; margin-top: 1px; }
+.bd-sim-stem { display: block; font-size: 13px; color: var(--text); line-height: 1.5; word-break: break-all; }
+.bd-sim-meta { display: block; font-size: 11px; color: var(--text3); margin-top: 2px; }
 .bank-import-result { display: none; font-size: 13px; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--fill); color: var(--text2); line-height: 1.6; }
 .bank-import-result.show { display: block; }
 .bs-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -578,9 +594,14 @@ body.teacher-mode .teacher-only { display: block !important; }
       <div class="bd-expl-text" id="bdExpl"></div>
     </div>
     <div class="setting-hint" id="bdSource" style="margin-top:8px;"></div>
+    <div id="bdSimilarWrap" style="display:none;margin-top:12px;">
+      <div class="setting-label">相似题（题库内）· 点击跳转定位</div>
+      <div class="bd-similar" id="bdSimilar"></div>
+    </div>
     <div class="bd-actions">
       <button class="setting-btn primary" id="bdPractice">🎯 练这道题</button>
       <button class="setting-btn secondary" id="bdAsk">💬 问 AI 讲解</button>
+      <button class="setting-btn secondary" id="bdLocate">📍 定位</button>
     </div>
   </div>
 </div>
@@ -1363,6 +1384,11 @@ function bindEvents() {
     if (btn) bankDetailPick(parseInt(btn.dataset.bdPick, 10));
   });
   $('#bdPractice').addEventListener('click', bankDetailTogglePractice);
+  $('#bdLocate').addEventListener('click', () => { if (bankDetailCtx) bankLocate(bankDetailCtx.q.id); });
+  $('#bdSimilar').addEventListener('click', e => {
+    const b = e.target.closest('[data-bd-jump]');
+    if (b) bankLocate(b.dataset.bdJump);
+  });
   $('#bdAsk').addEventListener('click', () => {
     if (!bankDetailCtx) return;
     $('#bankDetailModal').classList.remove('show');
@@ -1408,6 +1434,8 @@ function bindEvents() {
     if (saveBankBtn) { openBankSave(saveBankBtn); return; }
     const reportBtn = e.target.closest('[data-report-bank]');
     if (reportBtn) { reportBankIssue(reportBtn); return; }
+    const hit = e.target.closest('.bank-hit');
+    if (hit && hit.dataset.bankId) { bankLocate(hit.dataset.bankId); return; }
     const kchip = e.target.closest('.k-chip');
     if (kchip) { showKnowledgeDetail(kchip.dataset.gid); return; }
     const bubble = e.target.closest('.msg.assistant .msg-bubble');
@@ -2626,7 +2654,7 @@ const bankAll = () => bankTx('readonly', s => s.getAll()).then(r => r || []);
 const bankPut = q => bankTx('readwrite', s => s.put(q));
 const bankDelete = id => bankTx('readwrite', s => s.delete(id));
 const bankCount = () => bankTx('readonly', s => s.count());
-function bankInvalidate() { bankIndex = null; }
+function bankInvalidate() { bankIndex = null; bankGramsCache.clear(); }
 
 // 内置题库随应用分发；每个 id 只自动导入一次，用户删掉的内置题不会复活
 async function bankLoadBuiltin() {
@@ -2800,18 +2828,29 @@ function bankSplitQuestion(text) {
 function bankDice(a, b) {
   if (!a || !b) return 0;
   if (a === b) return 1;
-  const grams = s => { const set = new Set(); for (let i = 0; i < s.length - 1; i++) set.add(s.slice(i, i + 2)); if (s.length === 1) set.add(s); return set; };
-  const A = grams(a), B = grams(b);
+  const A = bankGrams(a), B = bankGrams(b);
   let inter = 0;
   for (const g of A) if (B.has(g)) inter++;
   return 2 * inter / (A.size + B.size);
+}
+let bankGramsCache = new Map();
+function bankGrams(s) {
+  let set = bankGramsCache.get(s);
+  if (!set) {
+    set = new Set();
+    for (let i = 0; i < s.length - 1; i++) set.add(s.slice(i, i + 2));
+    if (s.length === 1) set.add(s);
+    bankGramsCache.set(s, set);
+  }
+  return set;
 }
 async function ensureBankIndex() {
   if (bankIndex) return bankIndex;
   const all = await bankAll();
   bankIndex = all.map(q => ({
     id: q.id, norm: bankNorm(q.prompt), answer: q.answer,
-    level: q.level || '', source: q.source || '', paper: q.paper || '',
+    level: q.level || '', type: q.type || '', source: q.source || '', paper: q.paper || '',
+    prompt: q.prompt || '',
     choiceTexts: q.choices || [], choices: (q.choices || []).map(bankNorm),
   }));
   return bankIndex;
@@ -2845,7 +2884,7 @@ function bankHitHtml(b) {
   const ct = b.choiceTexts && b.choiceTexts[b.answer] ? `（${escHtml(b.choiceTexts[b.answer])}）` : '';
   const paper = b.paper ? ` · 📦 ${escHtml(b.paper)}` : '';
   const src = b.source ? ` · 来源：${escHtml(b.source)}` : '';
-  return `<div class="bank-hit" data-bank-id="${escAttr(b.id || '')}">📚 真题库命中 · 标准答案 ${n}${ct}${paper}${src} · 答案以库为准，解析由模型生成</div>`;
+  return `<div class="bank-hit" data-bank-id="${escAttr(b.id || '')}" title="点击跳转到题库中这道题的位置">📚 真题库命中 · 标准答案 ${n}${ct}${paper}${src} · 答案以库为准，解析由模型生成 <span class="bank-hit-open">📍 定位到题库 ›</span></div>`;
 }
 function bankAuthorityPrompt(b) {
   const n = b.answer + 1;
@@ -2896,6 +2935,60 @@ async function bankExport() {
   showToast(`已导出 ${all.length} 题（文件只在你本机）`);
 }
 
+// 相似题：题干二元组相似度 ＋ 选项重合度，取前 5
+async function bankSimilar(q, limit = 5) {
+  const idx = await ensureBankIndex();
+  const target = bankNorm(q.prompt);
+  const tc = (q.choices || []).map(bankNorm).filter(Boolean);
+  const out = [];
+  for (const e of idx) {
+    if (e.id === q.id || !e.norm) continue;
+    const dice = bankDice(target, e.norm);
+    const set = new Set(e.choices);
+    let inter = 0;
+    for (const c of tc) if (set.has(c)) inter++;
+    const union = new Set([...tc, ...e.choices]).size;
+    const jac = union ? inter / union : 0;
+    const score = 0.65 * dice + 0.35 * jac;
+    if (score >= 0.3) out.push({ e, score });
+  }
+  out.sort((a, b) => b.score - a.score);
+  return out.slice(0, limit);
+}
+async function renderBankSimilar(q) {
+  const wrap = $('#bdSimilarWrap');
+  try {
+    const list = await bankSimilar(q);
+    wrap.style.display = 'block';
+    if (!list.length) {
+      $('#bdSimilar').innerHTML = '<div class="setting-hint">库内暂无与本题相似的题（相似＝题干相近或选项重合）。</div>';
+      return;
+    }
+    $('#bdSimilar').innerHTML = list.map(({ e, score }) => `
+      <button type="button" class="bd-sim" data-bd-jump="${escAttr(e.id)}" title="跳转到题库中这道题的位置">
+        <span class="bd-sim-score">${Math.round(score * 100)}%</span>
+        <span style="min-width:0;">
+          <span class="bd-sim-stem">${escHtml((e.prompt || '').slice(0, 46))}${(e.prompt || '').length > 46 ? '…' : ''}</span>
+          <span class="bd-sim-meta">${escHtml(e.level)} ${escHtml(e.type)}${e.paper ? ' · 📦 ' + escHtml(e.paper) : ''}</span>
+        </span>
+      </button>`).join('');
+  } catch (e) { wrap.style.display = 'none'; }
+}
+// 跳回题库列表对应行：滚动到可视区域中央＋高亮闪烁
+async function bankLocate(id) {
+  $('#bankDetailModal').classList.remove('show');
+  $('#bankModal').classList.add('show');
+  try { await renderBank(); } catch (e) { showToast('题库不可用'); return; }
+  const row = document.querySelector('#bankList [data-bank-open="' + CSS.escape(id) + '"]');
+  if (!row) { showToast('题库里找不到这道题（可能已删除）'); return; }
+  const item = row.closest('.bank-item');
+  item.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  item.classList.remove('bi-flash');
+  void item.offsetWidth;
+  item.classList.add('bi-flash');
+  setTimeout(() => item.classList.remove('bi-flash'), 2000);
+}
+
 // 题库详情：点题目直接打开；view 看标准答案与解析，practice 隐藏答案做答
 let bankDetailCtx = null;
 async function openBankDetail(id) {
@@ -2903,6 +2996,7 @@ async function openBankDetail(id) {
   if (!q) { showToast('题目不存在'); return; }
   bankDetailCtx = { q, mode: 'view', picked: null };
   renderBankDetail();
+  renderBankSimilar(q);
   $('#bankDetailModal').classList.add('show');
 }
 function bankDetailHasAnswer(q) {
