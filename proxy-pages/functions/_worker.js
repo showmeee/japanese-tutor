@@ -66,11 +66,14 @@ export default {
     if (path === '/stats' && request.method === 'GET') {
       const admin = request.headers.get('X-Admin-Code') || url.searchParams.get('code') || '';
       if (!env.ADMIN_CODE || admin !== env.ADMIN_CODE) return json({ error: 'forbidden' }, 403, cors);
+      const n = Math.min(45, Math.max(14, parseInt(url.searchParams.get('days') || '14', 10) || 14));
       const days = [];
-      for (let i = 0; i < 14; i++) {
+      const seen = new Set();
+      for (let i = 0; i < n; i++) {
         const d = dayKey(i);
         let s = null;
         try { s = JSON.parse((await env.INVITES.get('stats:' + d)) || 'null'); } catch (e) {}
+        if (s && s.codes) Object.keys(s.codes).forEach(c => seen.add(c));
         days.push({
           date: d,
           req: s ? s.req : 0,
@@ -79,7 +82,17 @@ export default {
           events: s ? s.events : {},
         });
       }
-      return json({ days }, 200, cors);
+      const meta = {};
+      // 已发放但未用过的码也要给元信息（看板要显示「未激活」），KV 里无冒号的 8 位 key 即邀请码
+      const list = await env.INVITES.list();
+      for (const k of list.keys) {
+        if (!k.name.includes(':') && k.name.length === 8) seen.add(k.name);
+      }
+      for (const c of seen) {
+        const m = (await inviteMeta(env, c)) || {};
+        meta[c] = { teacher: !!m.teacher, bound: !!m.device };
+      }
+      return json({ days, meta }, 200, cors);
     }
 
     if (path === '/event' && request.method === 'POST') {
