@@ -294,6 +294,32 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
 .bank-item .bi-meta { color: var(--text3); font-size: 12px; margin-top: 2px; word-break: break-all; }
 .bank-item-del { border: none; background: var(--fill); color: var(--text3); border-radius: 50%; width: 24px; height: 24px; flex: none; cursor: pointer; }
 .bank-paper-head { font-size: 13px; font-weight: 600; color: var(--text2); margin: 10px 0 4px; padding: 4px 2px; border-bottom: 1px solid var(--sep); }
+.bank-item .bi-main { cursor: pointer; }
+.bank-item:hover { border-color: var(--primary); }
+.bank-item:hover .bi-stem { color: var(--primary); }
+.bd-badges { display: flex; gap: 6px; flex-wrap: wrap; margin: 2px 0 10px; }
+.bd-badge { font-size: 12px; padding: 2px 9px; border-radius: 999px; background: var(--primary-light); color: var(--primary); font-weight: 600; }
+.bd-badge.paper { background: rgba(175,82,222,0.12); color: var(--purple); }
+.bd-prompt { background: var(--card); border: 1px solid var(--sep); border-radius: 10px; padding: 12px; font-size: 15px; line-height: 1.7; white-space: pre-wrap; word-break: break-all; color: var(--text); }
+.bd-choices { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.bd-choice { display: flex; gap: 8px; align-items: flex-start; text-align: left; padding: 10px 12px; background: var(--card); border: 1px solid var(--sep); border-radius: 10px; font-size: 14px; line-height: 1.5; color: var(--text); cursor: pointer; transition: border-color .15s, background .15s, transform .05s; font-family: inherit; }
+.bd-choice:active { transform: scale(0.98); }
+.bd-choice.static { cursor: default; }
+.bd-choice.static:active { transform: none; }
+.bd-num { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--fill); color: var(--text2); font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: 600; margin-top: 1px; }
+.bd-choice.correct { border-color: var(--green); background: rgba(52,199,89,0.10); }
+.bd-choice.correct .bd-num { background: var(--green); color: #fff; }
+.bd-choice.wrong { border-color: var(--red); background: rgba(255,59,48,0.08); }
+.bd-choice.wrong .bd-num { background: var(--red); color: #fff; }
+.bd-result { margin-top: 10px; padding: 10px 12px; border-radius: 10px; font-size: 14px; font-weight: 600; animation: bdPop .25s ease; }
+.bd-result.ok { background: rgba(52,199,89,0.12); color: var(--green); }
+.bd-result.no { background: rgba(255,59,48,0.10); color: var(--red); }
+@keyframes bdPop { from { transform: scale(0.96); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.bd-expl-text { background: var(--card); border: 1px solid var(--sep); border-radius: 10px; padding: 12px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-all; color: var(--text2); max-height: 30vh; overflow-y: auto; }
+.bd-expl-text::-webkit-scrollbar { width: 6px; }
+.bd-expl-text::-webkit-scrollbar-thumb { background: var(--sep); border-radius: 3px; }
+.bd-actions { display: flex; gap: 8px; margin-top: 14px; }
+.bd-actions .setting-btn { flex: 1; margin-top: 0; }
 .bank-import-result { display: none; font-size: 13px; margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--fill); color: var(--text2); line-height: 1.6; }
 .bank-import-result.show { display: block; }
 .bs-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -535,6 +561,27 @@ body.teacher-mode .teacher-only { display: block !important; }
       <div class="setting-hint">「下架」删除该题并移除记录；「忽略」仅移除记录。内置题下架后不会自动恢复。</div>
     </div>
     <div class="bank-list" id="bankList"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="bankDetailModal">
+  <div class="modal" style="position:relative;">
+    <button class="modal-close" id="closeBankDetail">✕</button>
+    <h3>题目详情</h3>
+    <div class="bd-badges" id="bdBadges"></div>
+    <div class="bd-prompt" id="bdPrompt"></div>
+    <div class="setting-hint" id="bdPracticeHint" style="display:none;margin-top:8px;"></div>
+    <div class="bd-choices" id="bdChoices"></div>
+    <div class="bd-result" id="bdResult" style="display:none;"></div>
+    <div id="bdExplWrap" style="margin-top:12px;">
+      <div class="setting-label">解析</div>
+      <div class="bd-expl-text" id="bdExpl"></div>
+    </div>
+    <div class="setting-hint" id="bdSource" style="margin-top:8px;"></div>
+    <div class="bd-actions">
+      <button class="setting-btn primary" id="bdPractice">🎯 练这道题</button>
+      <button class="setting-btn secondary" id="bdAsk">💬 问 AI 讲解</button>
+    </div>
   </div>
 </div>
 
@@ -1062,11 +1109,7 @@ async function applyAskParam() {
     const data = await res.json();
     const q = (Array.isArray(data) ? data : (data.questions || [])).find(x => x && x.id === id);
     if (!q) return;
-    switchMode('exam');
-    inputText.value = q.prompt + '\n' + q.choices.map((c, i) => (i + 1) + ' ' + c).join('\n');
-    inputText.dispatchEvent(new Event('input', { bubbles: true }));
-    inputText.focus();
-    showToast('已预填真题，点 ↑ 发送让 AI 讲解');
+    prefillAsk(q);
   } catch (e) { console.warn('ask prefill failed:', e); }
 }
 
@@ -1303,11 +1346,28 @@ function bindEvents() {
   $('#bankExport').addEventListener('click', () => bankExport().catch(err => showToast('导出失败：' + (err.message || '请重试'))));
   $('#bankList').addEventListener('click', async e => {
     const del = e.target.closest('[data-bank-del]');
-    if (!del) return;
-    if (!confirm('删除这道题？删除后不可恢复。')) return;
-    await bankDelete(del.dataset.bankDel);
-    bankInvalidate();
-    renderBank();
+    if (del) {
+      if (!confirm('删除这道题？删除后不可恢复。')) return;
+      await bankDelete(del.dataset.bankDel);
+      bankInvalidate();
+      renderBank();
+      return;
+    }
+    const open = e.target.closest('[data-bank-open]');
+    if (open) openBankDetail(open.dataset.bankOpen);
+  });
+  $('#closeBankDetail').addEventListener('click', () => $('#bankDetailModal').classList.remove('show'));
+  $('#bankDetailModal').addEventListener('click', e => { if (e.target === $('#bankDetailModal')) $('#bankDetailModal').classList.remove('show'); });
+  $('#bdChoices').addEventListener('click', e => {
+    const btn = e.target.closest('[data-bd-pick]');
+    if (btn) bankDetailPick(parseInt(btn.dataset.bdPick, 10));
+  });
+  $('#bdPractice').addEventListener('click', bankDetailTogglePractice);
+  $('#bdAsk').addEventListener('click', () => {
+    if (!bankDetailCtx) return;
+    $('#bankDetailModal').classList.remove('show');
+    $('#bankModal').classList.remove('show');
+    prefillAsk(bankDetailCtx.q);
   });
   $('#bankReportsExport').addEventListener('click', bankReportsExport);
   $('#bankReports').addEventListener('click', async e => {
@@ -2813,7 +2873,7 @@ async function renderBank() {
   $('#bankCount').textContent = `共 ${all.length} 题 · ${paperCount} 套卷 · 仅存本机浏览器，不上传`;
   const itemHtml = q => `
     <div class="bank-item">
-      <div class="bi-main">
+      <div class="bi-main" data-bank-open="${escAttr(q.id)}" title="打开这道题">
         <div class="bi-stem">${escHtml((q.prompt || '').slice(0, 60))}${(q.prompt || '').length > 60 ? '…' : ''}</div>
         <div class="bi-meta">${escHtml(q.level || '')} ${escHtml(q.type || '')} · 答案 ${(q.answer ?? 0) + 1} · ${escHtml(q.source || '无来源')} · ${escHtml(q.id)}</div>
       </div>
@@ -2834,6 +2894,86 @@ async function bankExport() {
   a.click();
   URL.revokeObjectURL(url);
   showToast(`已导出 ${all.length} 题（文件只在你本机）`);
+}
+
+// 题库详情：点题目直接打开；view 看标准答案与解析，practice 隐藏答案做答
+let bankDetailCtx = null;
+async function openBankDetail(id) {
+  const q = (await bankAll()).find(x => x.id === id);
+  if (!q) { showToast('题目不存在'); return; }
+  bankDetailCtx = { q, mode: 'view', picked: null };
+  renderBankDetail();
+  $('#bankDetailModal').classList.add('show');
+}
+function bankDetailHasAnswer(q) {
+  return Number.isInteger(q.answer) && q.answer >= 0 && q.answer < (q.choices || []).length;
+}
+function renderBankDetail() {
+  const { q, mode, picked } = bankDetailCtx;
+  const hasAns = bankDetailHasAnswer(q);
+  const isOrder = q.type === 'GRAMMAR_ORDER';
+  $('#bdBadges').innerHTML = [q.level, q.type, q.paper].filter(Boolean)
+    .map((t, i) => `<span class="bd-badge${i === 2 ? ' paper' : ''}">${escHtml(t)}</span>`).join('');
+  $('#bdPrompt').textContent = q.prompt || '';
+  const hint = $('#bdPracticeHint');
+  if (mode === 'practice') {
+    hint.style.display = 'block';
+    hint.textContent = isOrder ? '排序题：点选应填在 ★ 位置的选项。' : '点选你的答案，选完立即判定。';
+  } else hint.style.display = 'none';
+  $('#bdChoices').innerHTML = (q.choices || []).map((c, i) => {
+    let cls = 'bd-choice', mark = '';
+    if (mode === 'view') {
+      cls += ' static';
+      if (hasAns && i === q.answer) { cls += ' correct'; mark = ' ✓'; }
+    } else if (picked !== null) {
+      cls += ' static';
+      if (hasAns && i === q.answer) cls += ' correct';
+      else if (i === picked) cls += ' wrong';
+    }
+    const tag = mode === 'practice' && picked === null ? 'button' : 'div';
+    const attr = tag === 'button' ? ` type="button" data-bd-pick="${i}"` : '';
+    return `<${tag} class="${cls}"${attr}><span class="bd-num">${i + 1}</span><span>${escHtml(c)}${mark}</span></${tag}>`;
+  }).join('');
+  const res = $('#bdResult');
+  if (mode === 'practice' && picked !== null) {
+    const ok = picked === q.answer;
+    res.style.display = 'block';
+    res.className = 'bd-result ' + (ok ? 'ok' : 'no');
+    res.textContent = ok
+      ? `✅ 答对了！${isOrder ? '★ 处应填「' + q.choices[q.answer] + '」。' : ''}`
+      : `❌ 答错了。正确答案是 ${q.answer + 1}（${q.choices[q.answer]}）。`;
+  } else res.style.display = 'none';
+  const showExpl = mode === 'view' || picked !== null;
+  $('#bdExplWrap').style.display = showExpl ? 'block' : 'none';
+  $('#bdExpl').textContent = (q.explanation || '').trim() || '（暂无解析：存题时留空了，问 AI 讲解后会现写。）';
+  $('#bdSource').textContent = `来源：${q.source || '无'} · id：${q.id}`;
+  const pb = $('#bdPractice');
+  if (!hasAns) { pb.disabled = true; pb.textContent = ' 该题未标答案'; }
+  else {
+    pb.disabled = false;
+    pb.textContent = mode === 'view' ? '🎯 练这道题' : (picked === null ? '👁 看答案与解析' : '🔁 再练一次');
+  }
+}
+function bankDetailPick(i) {
+  if (!bankDetailCtx || bankDetailCtx.mode !== 'practice' || bankDetailCtx.picked !== null) return;
+  if (!bankDetailHasAnswer(bankDetailCtx.q)) return;
+  bankDetailCtx.picked = i;
+  renderBankDetail();
+}
+function bankDetailTogglePractice() {
+  if (!bankDetailCtx || !bankDetailHasAnswer(bankDetailCtx.q)) return;
+  const c = bankDetailCtx;
+  if (c.mode === 'view') { c.mode = 'practice'; c.picked = null; }
+  else if (c.picked === null) { c.mode = 'view'; }
+  else { c.mode = 'practice'; c.picked = null; }
+  renderBankDetail();
+}
+function prefillAsk(q) {
+  switchMode('exam');
+  inputText.value = q.prompt + '\n' + q.choices.map((c, i) => (i + 1) + ' ' + c).join('\n');
+  inputText.dispatchEvent(new Event('input', { bubbles: true }));
+  inputText.focus();
+  showToast('已预填真题，点 ↑ 发送让 AI 讲解');
 }
 
 let bankSaveCtx = null;
