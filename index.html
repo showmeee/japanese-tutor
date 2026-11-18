@@ -300,6 +300,18 @@ ruby rt { font-size: 0.55em; color: var(--text3); font-weight: 400; line-height:
 .bd-badges { display: flex; gap: 6px; flex-wrap: wrap; margin: 2px 0 10px; }
 .bd-badge { font-size: 12px; padding: 2px 9px; border-radius: 999px; background: var(--primary-light); color: var(--primary); font-weight: 600; }
 .bd-badge.paper { background: rgba(175,82,222,0.12); color: var(--purple); }
+.bd-badge.user { background: rgba(255,149,0,0.14); color: #B26A00; }
+.bd-badge.teacher { background: rgba(52,199,89,0.14); color: #1D7A34; }
+.bank-hit.user { background: rgba(255,149,0,0.14); }
+.grow-offer { margin-top: 10px; padding: 10px 12px; border: 1px dashed rgba(255,149,0,0.6); border-radius: 12px; background: rgba(255,149,0,0.07); }
+.grow-title { font-size: 13px; font-weight: 700; color: #B26A00; }
+.grow-hint { font-size: 12px; color: var(--text2); margin-top: 4px; }
+.grow-picks { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.grow-pick { width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255,149,0,0.6); background: var(--card); color: #B26A00; font-weight: 700; font-size: 15px; cursor: pointer; transition: transform .15s; font-family: var(--font); }
+.grow-pick:active { transform: scale(.92); background: rgba(255,149,0,0.18); }
+.grow-state { font-size: 12px; color: var(--text2); margin-top: 6px; }
+.grow-state.ok { color: #1D7A34; font-weight: 600; }
+.grow-recheck .grow-picks { margin-top: 6px; }
 .bd-prompt { background: var(--card); border: 1px solid var(--sep); border-radius: 10px; padding: 12px; font-size: 15px; line-height: 1.7; white-space: pre-wrap; word-break: break-all; color: var(--text); }
 .bd-choices { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .bd-choice { display: flex; gap: 8px; align-items: flex-start; text-align: left; padding: 10px 12px; background: var(--card); border: 1px solid var(--sep); border-radius: 10px; font-size: 14px; line-height: 1.5; color: var(--text); cursor: pointer; transition: border-color .15s, background .15s, transform .05s; font-family: inherit; }
@@ -638,6 +650,7 @@ body.teacher-mode .teacher-only { display: block !important; }
         <option value="">请选择</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option>
       </select>
       <div class="setting-hint" id="bsHint"></div>
+      <div class="setting-hint" id="bsAuthority"></div>
     </div>
     <div class="setting-group">
       <div class="setting-label">解析（可留空，命中后由模型生成）</div>
@@ -1432,6 +1445,16 @@ function bindEvents() {
     if (checkBtn) { checkAnswer(checkBtn); return; }
     const saveBankBtn = e.target.closest('[data-save-bank]');
     if (saveBankBtn) { openBankSave(saveBankBtn); return; }
+    const gp = e.target.closest('[data-grow-pick]');
+    if (gp) { growPick(gp); return; }
+    const gs = e.target.closest('[data-grow-save]');
+    if (gs) { growSave(gs); return; }
+    const gd = e.target.closest('[data-grow-decline]');
+    if (gd) { growDecline(gd); return; }
+    const gu = e.target.closest('[data-grow-update]');
+    if (gu) { growUpdate(gu).catch(err => showToast('更新失败：' + (err.message || '请重试'))); return; }
+    const gk = e.target.closest('[data-grow-keep]');
+    if (gk) { growKeep(gk); return; }
     const reportBtn = e.target.closest('[data-report-bank]');
     if (reportBtn) { reportBankIssue(reportBtn); return; }
     const hit = e.target.closest('.bank-hit');
@@ -1733,14 +1756,14 @@ function renderMessage(msg) {
   } else {
     const html = (msg.bank ? bankHitHtml(msg.bank) : '') + DOMPurify.sanitize(marked.parse(msg.content || ''));
     const verify = msg.verify ? `<div class="check-result ${msg.verify.kind}">${escHtml(msg.verify.text)}</div>` : '';
-    return `<div class="msg assistant" data-raw="${escAttr(msg.content || '')}"><div class="msg-avatar">師</div><div class="msg-bubble">${html}${verify}${msgToolsHtml(msg)}</div></div>`;
+    return `<div class="msg assistant" data-raw="${escAttr(msg.content || '')}"><div class="msg-avatar">師</div><div class="msg-bubble">${html}${verify}${growRecheckHtml(msg)}${growOfferHtml(msg)}${msgToolsHtml(msg)}</div></div>`;
   }
 }
 
 function msgToolsHtml(msg) {
   const exam = state.mode === 'exam';
   const inBank = !!(msg && msg.bank);
-  const check = exam && !inBank ? '<button class="msg-tool" data-check-msg>🔁 复核</button>' : '';
+  const check = exam && (!inBank || (msg.bank && msg.bank.confirmedBy === 'user')) ? '<button class="msg-tool" data-check-msg>🔁 复核</button>' : '';
   const save = exam && !inBank ? '<button class="msg-tool" data-save-bank>💾 存题</button>' : '';
   const report = exam && inBank ? '<button class="msg-tool" data-report-bank>⚑ 报错</button>' : '';
   return `<div class="msg-tools"><button class="msg-tool" data-speak-msg>🔊 朗读日文</button>${check}${save}${report}</div>`;
@@ -2132,11 +2155,12 @@ async function sendMessage(opts = {}) {
       const idx = ocrChoices.findIndex(c => bankNorm(c) === cn);
       if (idx >= 0) { dispAnswer = idx; dispChoices = ocrChoices; }
     }
-    bankInfo = { id: bankHit.id, answer: dispAnswer, source: bankHit.source || '', level: bankHit.level || '', choiceTexts: dispChoices };
+    bankInfo = { id: bankHit.id, answer: dispAnswer, source: bankHit.source || '', level: bankHit.level || '', choiceTexts: dispChoices, confirmedBy: bankHit.confirmedBy || '' };
   }
   // Compress system prompt + inject relevant knowledge
   let systemPrompt = SYSTEM_PROMPTS[state.mode];
-  if (bankInfo) systemPrompt += bankAuthorityPrompt(bankInfo);
+  // 用户自行认定的答案不是权威：命中也独立重解，冲突交人裁决
+  if (bankInfo) systemPrompt += bankInfo.confirmedBy === 'user' ? bankRecheckPrompt(bankInfo) : bankAuthorityPrompt(bankInfo);
   const knowledgeInjection = injectRelevantKnowledge(text, conv.messages);
   if (knowledgeInjection) {
     systemPrompt += knowledgeInjection;
@@ -2239,7 +2263,10 @@ async function sendMessage(opts = {}) {
   }
   const pendingEl = document.getElementById('msg-pending');
   finalizeAssistantBubble(fullContent, bankInfo);
-  if (state.mode === 'exam' && !bankInfo && fullContent && !fullContent.startsWith('**错误**') && !fullContent.includes('（已停止生成）')) {
+  const cleanReply = fullContent && !fullContent.startsWith('**错误**') && !fullContent.includes('（已停止生成）');
+  if (state.mode === 'exam' && cleanReply && bankInfo && bankInfo.confirmedBy === 'user') {
+    growRecheckCompare(pendingEl, conv, conv.messages.length - 1, bankInfo, fullContent);
+  } else if (state.mode === 'exam' && !bankInfo && cleanReply) {
     autoVerifyAnswer(pendingEl, conv, conv.messages.length - 1, text, fullContent).catch(e => console.warn('auto verify failed:', e));
   }
   state.generating = false;
@@ -2519,7 +2546,8 @@ async function autoVerifyAnswer(msgEl, conv, msgIndex, qText, firstRaw) {
   const out = document.createElement('div');
   out.className = 'check-result warn';
   out.textContent = '⏳ 置信度低，正在独立二解验证…';
-  bubble.appendChild(out);
+  const toolsEl = bubble.querySelector('.msg-tools');
+  if (toolsEl) bubble.insertBefore(out, toolsEl); else bubble.appendChild(out);
   scrollToBottom();
   try {
     const text = await chatOnce([
@@ -2538,9 +2566,11 @@ async function autoVerifyAnswer(msgEl, conv, msgIndex, qText, firstRaw) {
       conv.messages[msgIndex].verify = { kind, text: note };
       saveState();
     }
+    maybeOfferConfirm(msgEl, conv, msgIndex, qText);
   } catch (e) {
     out.className = 'check-result err';
     out.textContent = '自动二解失败：' + (e.message || '请重试');
+    maybeOfferConfirm(msgEl, conv, msgIndex, qText);
   }
 }
 
@@ -2588,7 +2618,9 @@ async function checkAnswer(btn) {
     out.textContent = '复核失败：' + (e.message || '请重试');
     btn.textContent = '重试复核';
   }
-  msgEl.querySelector('.msg-bubble').appendChild(out);
+  const bub = msgEl.querySelector('.msg-bubble');
+  const toolsEl2 = bub.querySelector('.msg-tools');
+  if (toolsEl2) bub.insertBefore(out, toolsEl2); else bub.appendChild(out);
   btn.disabled = false;
 }
 
@@ -2850,6 +2882,7 @@ async function ensureBankIndex() {
   bankIndex = all.map(q => ({
     id: q.id, norm: bankNorm(q.prompt), answer: q.answer,
     level: q.level || '', type: q.type || '', source: q.source || '', paper: q.paper || '',
+    confirmedBy: q.confirmedBy || '',
     prompt: q.prompt || '',
     choiceTexts: q.choices || [], choices: (q.choices || []).map(bankNorm),
   }));
@@ -2884,7 +2917,21 @@ function bankHitHtml(b) {
   const ct = b.choiceTexts && b.choiceTexts[b.answer] ? `（${escHtml(b.choiceTexts[b.answer])}）` : '';
   const paper = b.paper ? ` · 📦 ${escHtml(b.paper)}` : '';
   const src = b.source ? ` · 来源：${escHtml(b.source)}` : '';
-  return `<div class="bank-hit" data-bank-id="${escAttr(b.id || '')}" title="点击跳转到题库中这道题的位置">📚 真题库命中 · 标准答案 ${n}${ct}${paper}${src} · 答案以库为准，解析由模型生成 <span class="bank-hit-open">📍 定位到题库 ›</span></div>`;
+  const loc = `<span class="bank-hit-open">📍 定位到题库 ›</span>`;
+  const id = escAttr(b.id || '');
+  if (b.confirmedBy === 'user') {
+    return `<div class="bank-hit user" data-bank-id="${id}" title="点击跳转到题库中这道题的位置">🙋 题库命中 · 用户自行认定答案 ${n}${ct}${paper}${src} · 未经官方/教师核定，本次独立重解 ${loc}</div>`;
+  }
+  const who = b.confirmedBy === 'teacher' ? '教师核定答案' : '标准答案';
+  return `<div class="bank-hit" data-bank-id="${id}" title="点击跳转到题库中这道题的位置">📚 真题库命中 · ${who} ${n}${ct}${paper}${src} · 答案以库为准，解析由模型生成 ${loc}</div>`;
+}
+function bankRecheckPrompt(b) {
+  const n = b.answer + 1;
+  const ct = b.choiceTexts && b.choiceTexts[b.answer] ? `（${b.choiceTexts[b.answer]}）` : '';
+  return `\n\n【题库命中·用户自行认定】库内记录答案为选项 ${n}${ct}，但仅为用户自行认定，未经官方/教师核定，不是权威答案。
+请独立执行解题协议：先排除后选择，逐项给硬性依据，不得因库内答案而改变结论。
+若你的结论与库内答案不同，在【教学提示】前加一行「与库内用户认定不一致：库=${n}，本次=你的答案」并给出证据。
+最后一行单独输出：最終答案：X（你的独立结论）`;
 }
 function bankAuthorityPrompt(b) {
   const n = b.answer + 1;
@@ -2914,7 +2961,7 @@ async function renderBank() {
     <div class="bank-item">
       <div class="bi-main" data-bank-open="${escAttr(q.id)}" title="打开这道题">
         <div class="bi-stem">${escHtml((q.prompt || '').slice(0, 60))}${(q.prompt || '').length > 60 ? '…' : ''}</div>
-        <div class="bi-meta">${escHtml(q.level || '')} ${escHtml(q.type || '')} · 答案 ${(q.answer ?? 0) + 1} · ${escHtml(q.source || '无来源')} · ${escHtml(q.id)}</div>
+        <div class="bi-meta">${escHtml(q.level || '')} ${escHtml(q.type || '')} · 答案 ${(q.answer ?? 0) + 1} · ${escHtml(q.source || '无来源')}${q.confirmedBy === 'user' ? ' · 🙋 用户自行认定' : q.confirmedBy === 'teacher' ? ' · 🧑‍🏫 教师核定' : ''} · ${escHtml(q.id)}</div>
       </div>
       <button class="bank-item-del" data-bank-del="${escAttr(q.id)}">✕</button>
     </div>`;
@@ -3006,8 +3053,11 @@ function renderBankDetail() {
   const { q, mode, picked } = bankDetailCtx;
   const hasAns = bankDetailHasAnswer(q);
   const isOrder = q.type === 'GRAMMAR_ORDER';
-  $('#bdBadges').innerHTML = [q.level, q.type, q.paper].filter(Boolean)
-    .map((t, i) => `<span class="bd-badge${i === 2 ? ' paper' : ''}">${escHtml(t)}</span>`).join('');
+  const badges = [q.level, q.type].filter(Boolean).map(t => `<span class="bd-badge">${escHtml(t)}</span>`);
+  if (q.paper) badges.push(`<span class="bd-badge paper">${escHtml(q.paper)}</span>`);
+  if (q.confirmedBy === 'user') badges.push('<span class="bd-badge user">🙋 用户自行认定</span>');
+  if (q.confirmedBy === 'teacher') badges.push('<span class="bd-badge teacher">🧑‍🏫 教师核定</span>');
+  $('#bdBadges').innerHTML = badges.join('');
   $('#bdPrompt').textContent = q.prompt || '';
   const hint = $('#bdPracticeHint');
   if (mode === 'practice') {
@@ -3070,8 +3120,159 @@ function prefillAsk(q) {
   showToast('已预填真题，点 ↑ 发送让 AI 讲解');
 }
 
+// ─── 养库闭环：存疑 → 人工认定 → 提示入库（标注来源）→ 再问独立重解 → 冲突裁决 ───
+const GROW_DECLINED_KEY = 'goshi_grow_declined';
+function growProvLabel(by) { return by === 'teacher' ? '教师核定' : '用户自行认定'; }
+function growDeclinedHas(stem) {
+  try { return JSON.parse(localStorage.getItem(GROW_DECLINED_KEY) || '[]').includes(bankNorm(stem)); } catch (e) { return false; }
+}
+function growDeclinedAdd(stem) {
+  const n = bankNorm(stem);
+  if (!n) return;
+  try {
+    const a = JSON.parse(localStorage.getItem(GROW_DECLINED_KEY) || '[]');
+    if (!a.includes(n)) { a.push(n); while (a.length > 200) a.shift(); localStorage.setItem(GROW_DECLINED_KEY, JSON.stringify(a)); }
+  } catch (e) {}
+}
+function growCtx(msgEl) {
+  const conv = state.conversations[state.currentId];
+  if (!conv || !msgEl) return null;
+  const raw = msgEl.dataset.raw || '';
+  for (let i = conv.messages.length - 1; i >= 0; i--) {
+    const m = conv.messages[i];
+    if (m.role === 'assistant' && (m.content || '') === raw) return { conv, idx: i, msg: m };
+  }
+  return null;
+}
+function growOfferHtml(msg) {
+  if (!msg || !msg.growOffer || msg.bank) return '';
+  const label = growProvLabel(msg.confirmedBy);
+  let body;
+  if (msg.savedBankId) {
+    body = `<div class="grow-state ok">✓ 已存入题库（${label}）。再问这道题时 AI 会独立重解复核。</div>`;
+  } else if (msg.saveDeclined) {
+    body = '<div class="grow-state">已跳过存题。以后想存仍可点下方 💾 存题。</div>';
+  } else if (msg.confirmed) {
+    body = `<div class="grow-state">已认定答案 ${msg.confirmed}。要存入题库吗？</div>
+      <div class="grow-picks"><button class="msg-tool" data-grow-save>💾 存入（标注${label}）</button><button class="msg-tool" data-grow-decline>算了</button></div>`;
+  } else {
+    const picks = Array.from({ length: msg.growChoices || 4 }, (_, i) => `<button class="grow-pick" data-grow-pick="${i + 1}">${i + 1}</button>`).join('');
+    body = `<div class="grow-hint">你或老师若已确认正确答案，点选认定；之后可选择是否存入题库（标注「${growProvLabel(state.teacherMode ? 'teacher' : 'user')}」）。不存不影响本次讲解。</div><div class="grow-picks">${picks}<button class="msg-tool" data-grow-decline>算了</button></div>`;
+  }
+  return `<div class="grow-offer"><div class="grow-title">🌱 养库 · 这题我没把握，但值得积累</div>${body}</div>`;
+}
+function growReplacePanel(msgEl, msg) {
+  const old = msgEl && msgEl.querySelector('.grow-offer');
+  if (old) old.outerHTML = growOfferHtml(msg);
+}
+function growInsertBeforeTools(bubble, html) {
+  const tools = bubble.querySelector('.msg-tools');
+  if (tools) tools.insertAdjacentHTML('beforebegin', html);
+  else bubble.insertAdjacentHTML('beforeend', html);
+}
+// 只对有完整题干+选项的选择题提示养库（自由问答不值得入库）；declined 过的题不再骚扰
+function maybeOfferConfirm(msgEl, conv, msgIndex, qText) {
+  const msg = conv && conv.messages[msgIndex];
+  if (!msg || msg.bank || msg.growOffer) return;
+  const { stem, choices } = bankSplitQuestion(qText || '');
+  if (!stem || choices.length < 3 || growDeclinedHas(stem)) return;
+  msg.growOffer = true;
+  msg.growChoices = choices.length;
+  msg.growStem = stem;
+  saveState();
+  const bubble = msgEl && msgEl.querySelector('.msg-bubble');
+  if (bubble) { growInsertBeforeTools(bubble, growOfferHtml(msg)); scrollToBottom(); }
+}
+function growPick(btn) {
+  const msgEl = btn.closest('.msg.assistant');
+  const c = growCtx(msgEl);
+  if (!c) return;
+  c.msg.confirmed = parseInt(btn.dataset.growPick, 10);
+  saveState();
+  growReplacePanel(msgEl, c.msg);
+}
+function growSave(btn) {
+  const msgEl = btn.closest('.msg.assistant');
+  const c = growCtx(msgEl);
+  if (!c || !c.msg.confirmed) return;
+  openBankSave(btn, { answer: c.msg.confirmed, msg: c.msg, msgEl });
+}
+function growDecline(btn) {
+  const msgEl = btn.closest('.msg.assistant');
+  const c = growCtx(msgEl);
+  if (!c) return;
+  c.msg.saveDeclined = true;
+  growDeclinedAdd(c.msg.growStem || '');
+  saveState();
+  growReplacePanel(msgEl, c.msg);
+}
+function growRecheckHtml(msg) {
+  const r = msg && msg.recheck;
+  if (!r) return '';
+  let extra = '';
+  if (r.kind === 'warn' && r.ai && !r.updated && !r.kept) {
+    extra = `<div class="grow-picks"><button class="msg-tool" data-grow-update>更新库答案为 ${r.ai}</button><button class="msg-tool" data-grow-keep>保留库答案 ${(msg.bank.answer ?? 0) + 1}</button></div>`;
+  }
+  return `<div class="check-result grow-recheck ${r.kind}">${escHtml(r.text)}${extra}</div>`;
+}
+// 用户自行认定的题被再次问到时：主解答已是独立重解，这里比对结论并交人裁决
+function growRecheckCompare(msgEl, conv, msgIndex, b, raw) {
+  const msg = conv && conv.messages[msgIndex];
+  if (!msg || msg.recheck) return;
+  const bubble = msgEl && msgEl.querySelector('.msg-bubble');
+  if (!bubble) return;
+  const a = parseAnswer(raw);
+  const lib = (b.answer ?? 0) + 1;
+  let kind, text;
+  if (!a) { kind = 'warn'; text = '⚠️ 独立重解未给确定答案；库内答案仅为用户自行认定，请人工核对。'; }
+  else if (parseInt(a, 10) === lib) { kind = 'ok'; text = `✅ 独立重解与库内用户认定一致：答案 ${a}（仍标注用户自行认定）`; }
+  else { kind = 'warn'; text = `⚠️ 独立重解结论 ${a} 与库内用户认定 ${lib} 不一致，交你裁决：`; }
+  msg.recheck = { kind, text, ai: a ? parseInt(a, 10) : 0, updated: false, kept: false };
+  saveState();
+  growInsertBeforeTools(bubble, growRecheckHtml(msg));
+  scrollToBottom();
+}
+async function growUpdate(btn) {
+  const msgEl = btn.closest('.msg.assistant');
+  const c = growCtx(msgEl);
+  if (!c || !c.msg.recheck || !c.msg.bank || !c.msg.recheck.ai) return;
+  const ai = c.msg.recheck.ai;
+  const entry = (await bankAll()).find(q => q.id === c.msg.bank.id);
+  if (!entry) { showToast('题库里找不到这道题（可能已删除）'); return; }
+  const aiText = (c.msg.bank.choiceTexts || [])[ai - 1] || '';
+  const ni = (entry.choices || []).findIndex(ch => bankNorm(ch) === bankNorm(aiText));
+  if (ni < 0) { showToast('选项顺序对不上，请在题库详情里手动改答案'); return; }
+  entry.answer = ni;
+  entry.confirmedBy = state.teacherMode ? 'teacher' : 'user';
+  entry.reconfirmedAt = Date.now();
+  await bankPut(entry);
+  bankInvalidate();
+  c.msg.recheck.updated = true;
+  c.msg.recheck.kind = 'ok';
+  c.msg.recheck.text = `✓ 库答案已更新为 ${ai}（${growProvLabel(entry.confirmedBy)}）`;
+  c.msg.bank.answer = ai - 1;
+  c.msg.bank.confirmedBy = entry.confirmedBy;
+  saveState();
+  const old = msgEl.querySelector('.grow-recheck');
+  if (old) old.outerHTML = growRecheckHtml(c.msg);
+  const hitEl = msgEl.querySelector('.bank-hit');
+  if (hitEl) hitEl.outerHTML = bankHitHtml(c.msg.bank);
+  showToast('库答案已更新');
+}
+function growKeep(btn) {
+  const msgEl = btn.closest('.msg.assistant');
+  const c = growCtx(msgEl);
+  if (!c || !c.msg.recheck) return;
+  const r = c.msg.recheck;
+  r.kept = true;
+  r.text = `已保留库答案 ${(c.msg.bank.answer ?? 0) + 1}；本次讲解按 AI 独立结论 ${r.ai} 展示，库答案待老师核定。`;
+  saveState();
+  const old = msgEl.querySelector('.grow-recheck');
+  if (old) old.outerHTML = growRecheckHtml(c.msg);
+}
+
 let bankSaveCtx = null;
-function openBankSave(btn) {
+function openBankSave(btn, opts = {}) {
   const msgEl = btn.closest('.msg.assistant');
   let prev = msgEl.previousElementSibling;
   while (prev && !prev.classList.contains('user')) prev = prev.previousElementSibling;
@@ -3079,16 +3280,20 @@ function openBankSave(btn) {
   const raw = msgEl.dataset.raw || '';
   const { stem, choices } = bankSplitQuestion(qText);
   const ans = parseAnswer(raw);
-  bankSaveCtx = { btn };
+  const confirmedBy = state.teacherMode ? 'teacher' : 'user';
+  bankSaveCtx = { btn, confirmedBy, msg: opts.msg || null, msgEl: opts.msgEl || null };
   $('#bsLevel').value = '';
   $('#bsType').value = '';
   $('#bsPrompt').value = stem || qText;
   for (let i = 1; i <= 4; i++) $('#bsC' + i).value = choices[i - 1] || '';
-  $('#bsAnswer').value = ans && /^[1-4]$/.test(ans) ? ans : '';
+  $('#bsAnswer').value = opts.answer ? String(opts.answer) : (ans && /^[1-4]$/.test(ans) ? ans : '');
   $('#bsExpl').value = raw.replace(/\n?最終答案[：:].*$/, '').trim().slice(0, 2000);
   $('#bsPaper').value = '';
   $('#bsSource').value = '';
-  $('#bsHint').textContent = ans ? '答案预填自模型解析，请务必核对后再存入。' : '模型未给确定答案：请老师手动选择正确答案后存入。';
+  $('#bsHint').textContent = opts.answer ? '答案来自你/老师在聊天内的认定（非模型输出）。' : (ans ? '答案预填自模型解析，请务必核对后再存入。' : '模型未给确定答案：请老师手动选择正确答案后存入。');
+  $('#bsAuthority').textContent = confirmedBy === 'teacher'
+    ? '存入后标注：🧑‍🏫 教师核定（教师模式确认）。'
+    : '存入后标注：🙋 用户自行认定（非官方/教师核定；再问时 AI 会独立重解，冲突交你裁决）。';
   $('#bankSaveModal').classList.add('show');
 }
 async function confirmBankSave() {
@@ -3103,6 +3308,7 @@ async function confirmBankSave() {
     explanation: $('#bsExpl').value.trim(),
     source: $('#bsSource').value.trim(),
     paper: $('#bsPaper').value.trim(),
+    confirmedBy: (bankSaveCtx && bankSaveCtx.confirmedBy) || 'user',
     createdAt: Date.now(),
   };
   const err = bankValidate(q);
@@ -3113,6 +3319,12 @@ async function confirmBankSave() {
   bankInvalidate();
   $('#bankSaveModal').classList.remove('show');
   if (bankSaveCtx && bankSaveCtx.btn) { bankSaveCtx.btn.textContent = '✓ 已存'; bankSaveCtx.btn.disabled = true; }
+  if (bankSaveCtx && bankSaveCtx.msg) {
+    bankSaveCtx.msg.savedBankId = q.id;
+    bankSaveCtx.msg.confirmedBy = q.confirmedBy;
+    saveState();
+    growReplacePanel(bankSaveCtx.msgEl, bankSaveCtx.msg);
+  }
   showToast(`已存入真题库（共 ${await bankCount()} 题）`);
 }
 
